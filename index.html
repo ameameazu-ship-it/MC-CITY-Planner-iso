@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#020b18">
+<title>MC City Planner ISO</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="app">
+  <div id="topbar">
+    <div id="topbar-btns">
+      <span class="title">⬡ MC CITY ISO</span>
+      <button class="tb-btn" id="btn-undo">↩戻す</button>
+      <button class="tb-btn" id="btn-redo">↪進む</button>
+      <button class="tb-btn" id="btn-zi">＋</button>
+      <button class="tb-btn" id="btn-zo">－</button>
+      <button class="tb-btn" id="btn-center">⌖中心</button>
+      <button class="tb-btn on" id="btn-night">🌙夜</button>
+      <button class="tb-btn" id="btn-settings">⚙設定</button>
+    </div>
+  </div>
+
+  <div id="main-area">
+    <div id="canvas-wrap">
+      <canvas id="gc"></canvas>
+      <canvas id="ov"></canvas>
+    </div>
+
+    <!-- Settings Panel -->
+    <div id="settings-backdrop"></div>
+    <div id="settings-panel">
+      <div class="settings-title">⚙ SETTINGS</div>
+      <div class="settings-row">
+        <div><div class="settings-row-label">🔊 配置音</div></div>
+        <button id="settings-sound" class="toggle-btn on">ON</button>
+      </div>
+      <div class="settings-row">
+        <div><div class="settings-row-label">📳 バイブ</div></div>
+        <button id="settings-vibe" class="toggle-btn on">ON</button>
+      </div>
+      <div class="settings-row">
+        <div><div class="settings-row-label">⊞ グリッド</div></div>
+        <button id="settings-grid" class="toggle-btn on">ON</button>
+      </div>
+      <div class="settings-row">
+        <div><div class="settings-row-label">🌐 言語</div></div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;">
+          <button class="lang-btn active" data-lang="ja">🇯🇵JA</button>
+          <button class="lang-btn" data-lang="en">🇺🇸EN</button>
+          <button class="lang-btn" data-lang="zh">🇨🇳ZH</button>
+          <button class="lang-btn" data-lang="ko">🇰🇷KO</button>
+        </div>
+      </div>
+      <div class="settings-divider"></div>
+      <div id="field-save-area" style="margin-bottom:8px;">
+        <input id="field-name-input" type="text" placeholder="マップ名..." maxlength="30"
+          style="width:100%;padding:9px 10px;border-radius:8px;box-sizing:border-box;background:rgba(255,255,255,.06);border:1.5px solid var(--border);color:#fff;font-size:15px;font-family:'Noto Sans JP',sans-serif;outline:none;margin-bottom:6px;display:block;">
+        <button id="settings-save" class="settings-action primary">💾 保存</button>
+      </div>
+      <div id="field-slot-list"></div>
+      <button id="settings-clear" class="settings-action danger">🗑 マップをクリア</button>
+      <button id="settings-close" class="settings-close">閉じる</button>
+    </div>
+
+    <!-- Block Sheet -->
+    <div id="sheet-backdrop"></div>
+    <div id="sheet">
+      <div id="sheet-handle"></div>
+      <div id="sheet-tabs"></div>
+      <div id="sheet-body">
+        <div class="block-grid" id="block-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="bottom-bar">
+    <button id="sel-preview">
+      <div id="sel-icon" style="font-size:22px;line-height:1;">🏠</div>
+      <div id="sel-label" style="font-size:7px;color:var(--gold);font-weight:700;margin-top:2px;">選択中</div>
+    </button>
+    <button class="bb-btn active" id="tool-draw">✏<span class="bb-lbl">描く</span></button>
+    <button class="bb-btn" id="tool-erase">🗑<span class="bb-lbl">消す</span></button>
+    <button class="bb-btn" id="tool-fill">🪣<span class="bb-lbl">塗り</span></button>
+    <button id="parts-btn">🗂<span style="font-size:8px;font-weight:700;opacity:.75;">一覧</span></button>
+  </div>
+</div>
+
+<!-- Context Menu (direction / delete) -->
+<div id="ctx-menu">
+  <div class="ctx-title" id="ctx-title">向き</div>
+  <div class="ctx-dir-grid">
+    <div></div><button class="ctx-dir-btn" data-dir="N">↑</button><div></div>
+    <button class="ctx-dir-btn" data-dir="W">←</button>
+    <button class="ctx-dir-btn center-btn" data-dir="none" id="ctx-auto">自動</button>
+    <button class="ctx-dir-btn" data-dir="E">→</button>
+    <div></div><button class="ctx-dir-btn" data-dir="S">↓</button><div></div>
+  </div>
+  <div class="ctx-sep"></div>
+  <button class="ctx-action danger" id="ctx-delete">🗑 削除</button>
+  <button id="ctx-close">閉じる</button>
+</div>
+
+<!-- JS: load order matters -->
+<script src="js/constants.js"></script>
+<script src="js/iso-engine.js"></script>
+<script src="js/nature-draw.js"></script>
+<script src="js/roads-draw.js"></script>
+<script src="js/blocks-draw.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/interaction.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
