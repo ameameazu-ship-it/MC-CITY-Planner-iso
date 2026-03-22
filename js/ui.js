@@ -133,6 +133,9 @@ var I18N = {
 
 function t(k){ return (I18N[lang] || I18N.ja)[k] || k; }
 
+// ブロック名取得：その言語になければen→jaの順でフォールバック
+function bname(b){ return b.name[lang] || b.name.en || b.name.ja; }
+
 // ── applyLang ─────────────────────────────────────────────────────
 function applyLang(newLang){
   lang = newLang;
@@ -174,7 +177,7 @@ function applyLang(newLang){
   var selLabel = document.getElementById('sel-label');
   if(selLabel){
     var selBlock = BLOCKS[selectedId];
-    selLabel.textContent = selBlock ? (selBlock.name[lang] || selBlock.name.ja) : t('selected');
+    selLabel.textContent = selBlock ? bname(selBlock) : t('selected');
   }
 
   rebuildSheet();
@@ -191,7 +194,7 @@ function buildSheet(){
   if(!tabs || !grid) return;
   tabs.innerHTML = CATS.map(function(c){
     return '<button class="s-tab' + (c.id === currentCat ? ' active' : '') + '" data-cat="' + c.id + '">'
-      + c.icon + ' ' + (c.name[lang] || c.name.ja) + '</button>';
+      + c.icon + ' ' + bname(c) + '</button>';
   }).join('');
   tabs.querySelectorAll('.s-tab').forEach(function(btn){
     btn.addEventListener('click', function(){ switchCat(btn.dataset.cat); });
@@ -217,7 +220,7 @@ function renderCat(catId){
   grid.innerHTML = ids.map(function(id){
     var b = BLOCKS[id];
     return '<button class="block-btn' + (id === selectedId ? ' selected' : '') + '" data-id="' + id + '">'
-      + (b.icon || '?') + '<span class="block-label">' + (b.name[lang] || b.name.ja) + '</span></button>';
+      + (b.icon || '?') + '<span class="block-label">' + bname(b) + '</span></button>';
   }).join('');
   grid.querySelectorAll('.block-btn').forEach(function(btn){
     btn.addEventListener('click', function(){ selectBlock(btn.dataset.id); });
@@ -228,7 +231,7 @@ function selectBlock(id){
   selectedId = id;
   var b = BLOCKS[id]; if(!b) return;
   var icon  = document.getElementById('sel-icon');  if(icon)  icon.textContent  = b.icon || '?';
-  var label = document.getElementById('sel-label'); if(label) label.textContent = b.name[lang] || b.name.ja;
+  var label = document.getElementById('sel-label'); if(label) label.textContent = bname(b);
   document.querySelectorAll('.block-btn').forEach(function(btn){
     btn.classList.toggle('selected', btn.dataset.id === id);
   });
@@ -278,7 +281,7 @@ function openCtxMenu(c, r, screenX, screenY){
     b.classList.toggle('active-dir', b.dataset.dir === curDir);
   });
   var titleEl = document.getElementById('ctx-title');
-  if(titleEl) titleEl.textContent = (BLOCKS[cell.id] ? (BLOCKS[cell.id].name[lang] || '') : '');
+  if(titleEl) titleEl.textContent = (BLOCKS[cell.id] ? bname(BLOCKS[cell.id]) : '');
 }
 
 function closeCtxMenu(){ document.getElementById('ctx-menu').classList.remove('show'); }
