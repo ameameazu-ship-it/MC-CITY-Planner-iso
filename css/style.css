@@ -125,10 +125,9 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
 
 /* ── 一覧ボタン（円・右端から飛び出す） */
 #parts-btn{
-  position:absolute;
+  position:fixed;
   right:-16px;
-  top:50%;
-  transform:translateY(calc(-50% - env(safe-area-inset-bottom, 0px) / 2));
+  bottom:calc(env(safe-area-inset-bottom) + 4px);
   width:96px;
   height:96px;
   border-radius:50%;
@@ -140,26 +139,26 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
   align-items:center;
   justify-content:center;
   cursor:pointer;
-  z-index:35; /* シート(30)より上 */
+  z-index:35;
   touch-action:manipulation;
   gap:3px;
   flex-shrink:0;
   box-shadow:none;
-  transition:transform .18s cubic-bezier(.34,1.56,.64,1), border-color .15s, background .15s, opacity .15s ease;
+  transition:transform .18s cubic-bezier(.34,1.56,.64,1), border-color .15s, background .15s;
   -webkit-tap-highlight-color:transparent;
 }
 #parts-btn.sheet-open{
-  z-index:25; /* シート(30)より下 → シートに重なる部分だけ隠れる */
+  z-index:25; /* シート(z-index:30)より下 */
 }
 #parts-btn:active{
-  transform:translateY(calc(-50% - env(safe-area-inset-bottom, 0px) / 2)) scale(.82);
+  transform:scale(.82);
   background:linear-gradient(180deg,#071828,#071828);
   border-color:#ffe066;
 }
 @keyframes parts-pop{
-  0%  { transform:translateY(calc(-50% - env(safe-area-inset-bottom,0px)/2)) scale(.92); }
-  55% { transform:translateY(calc(-50% - env(safe-area-inset-bottom,0px)/2)) scale(1.05); }
-  100%{ transform:translateY(calc(-50% - env(safe-area-inset-bottom,0px)/2)) scale(1); }
+  0%  { transform:scale(.92); }
+  55% { transform:scale(1.05); }
+  100%{ transform:scale(1); }
 }
 #parts-btn.popping{
   animation:parts-pop .25s cubic-bezier(.34,1.56,.64,1) forwards;
