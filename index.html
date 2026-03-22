@@ -36,6 +36,7 @@
     <!-- ===== SETTINGS PANEL ===== -->
     <div id="settings-backdrop"></div>
     <div id="settings-panel">
+      <button id="settings-x" onclick="closeSettings()">✕</button>
       <div class="settings-title">⚙ SETTINGS</div>
 
       <!-- 夜間モード（最上部） -->
@@ -207,6 +208,30 @@
 </div>
 
 <!-- JS: load order matters -->
+<script>
+// ブラウザ全体のピンチズーム・ダブルタップズームを禁止
+// （canvas-wrap内のタッチはinteraction.jsが処理するため除外）
+document.addEventListener('gesturestart',  function(e){ e.preventDefault(); }, {passive:false});
+document.addEventListener('gesturechange', function(e){ e.preventDefault(); }, {passive:false});
+document.addEventListener('gestureend',    function(e){ e.preventDefault(); }, {passive:false});
+document.addEventListener('touchmove', function(e){
+  if(e.touches.length > 1){
+    var wrap = document.getElementById('canvas-wrap');
+    if(wrap && wrap.contains(e.target)) return; // canvas内はOK
+    e.preventDefault(); // それ以外（バー等）は禁止
+  }
+}, {passive:false});
+// ダブルタップズーム禁止
+var lastTap = 0;
+document.addEventListener('touchend', function(e){
+  var now = Date.now();
+  if(now - lastTap < 300){
+    var wrap = document.getElementById('canvas-wrap');
+    if(!(wrap && wrap.contains(e.target))) e.preventDefault();
+  }
+  lastTap = now;
+}, {passive:false});
+</script>
 <script src="js/constants.js"></script>
 <script src="js/iso-engine.js"></script>
 <script src="js/nature-draw.js"></script>
