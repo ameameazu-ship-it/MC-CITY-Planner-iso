@@ -61,7 +61,7 @@ function switchCat(catId){
 
 function renderCat(catId){
   var grid = document.getElementById('block-grid'); if(!grid) return;
-  var ids = Object.keys(BLOCKS).filter(function(id){ return BLOCKS[id].cat===catId; });
+  var ids = Object.keys(BLOCKS).filter(function(id){ return BLOCKS[id].cat===catId && !BLOCKS[id].hidden; });
   grid.innerHTML = ids.map(function(id){
     var b = BLOCKS[id];
     return '<button class="block-btn'+(id===selectedId?' selected':'')+'" data-id="'+id+'">'
