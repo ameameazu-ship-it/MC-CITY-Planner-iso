@@ -23,12 +23,12 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
 .tb-btn{min-width:44px;height:38px;padding:0 8px;border:1.5px solid var(--border);border-radius:8px;background:linear-gradient(180deg,#0f2a42,#071828);color:var(--text);cursor:pointer;font-size:10px;font-weight:700;font-family:'Noto Sans JP',sans-serif;display:flex;align-items:center;justify-content:center;flex-shrink:0;white-space:nowrap;gap:2px;transition:transform .18s cubic-bezier(.34,1.56,.64,1), border-color .15s, background .15s;box-shadow:0 2px 6px rgba(0,0,0,.4);-webkit-tap-highlight-color:transparent;}
 .tb-btn:active{transform:scale(.88);}
 @keyframes tb-pop{
-  0%  { transform:scale(.88); }
-  55% { transform:scale(1.06); }
+  0%  { transform:scale(1); }
+  25% { transform:scale(.88); }
   100%{ transform:scale(1); }
 }
 .tb-btn.popping{
-  animation:tb-pop .22s cubic-bezier(.34,1.56,.64,1) forwards;
+  animation:tb-pop .18s ease-out forwards;
 }
 .tb-btn.on{background:linear-gradient(180deg,#1a5a9a,#0a3060);border-color:var(--blue);color:#fff;}
 .tb-btn:disabled{opacity:.35;pointer-events:none;}
@@ -140,13 +140,16 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
   align-items:center;
   justify-content:center;
   cursor:pointer;
-  z-index:10;
+  z-index:35; /* シート(30)より上 */
   touch-action:manipulation;
   gap:3px;
   flex-shrink:0;
   box-shadow:none;
   transition:transform .18s cubic-bezier(.34,1.56,.64,1), border-color .15s, background .15s, opacity .15s ease;
   -webkit-tap-highlight-color:transparent;
+}
+#parts-btn.sheet-open{
+  z-index:25; /* シート(30)より下 → シートに重なる部分だけ隠れる */
 }
 #parts-btn:active{
   transform:translateY(calc(-50% - env(safe-area-inset-bottom, 0px) / 2)) scale(.82);
