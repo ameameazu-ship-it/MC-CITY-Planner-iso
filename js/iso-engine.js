@@ -4,7 +4,7 @@
  */
 
 // ── Global render state ──────────────────────────────────────────
-var cells   = {};      // "c,r" -> {id, dir}
+var cells   = {};
 var panX = 0, panY = 0, zoom = DEFAULT_ZOOM;
 var nightMode = false;
 var showGrid  = true;
@@ -18,7 +18,6 @@ function inGrid(c,r){ return c>=0 && c<COLS && r>=0 && r<ROWS; }
 function getCell(c,r){ return cells[ck(c,r)] || null; }
 
 // ── ISO coordinate conversions ───────────────────────────────────
-// Returns canvas pixel position of the NORTH vertex of tile (c,r).
 function cellToScreen(c,r){
   return {
     x: panX + (c - r) * HW * zoom,
@@ -26,7 +25,6 @@ function cellToScreen(c,r){
   };
 }
 
-// Returns fractional grid cell from canvas pixel position.
 function screenToCell(sx, sy){
   var dx = (sx - panX) / (HW * zoom);
   var dy = (sy - panY) / (HH * zoom);
@@ -36,14 +34,12 @@ function screenToCell(sx, sy){
   };
 }
 
-// Centre the view on the grid midpoint.
 function centerView(){
   var mid = cellToScreen(COLS/2, ROWS/2);
   panX += cw/2 - mid.x;
   panY += ch/2 - mid.y;
 }
 
-// Zoom keeping canvas point (cx,cy) fixed.
 function zoomAround(cx, cy, factor){
   var nz = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * factor));
   panX = cx - (cx - panX) * (nz / zoom);
@@ -60,11 +56,10 @@ function drawDiamond(ctx, x, y, fill, stroke, strokeW){
   ctx.lineTo(x,    y+hh*2);
   ctx.lineTo(x-hw, y+hh);
   ctx.closePath();
-  if(fill)  { ctx.fillStyle=fill; ctx.fill(); }
+  if(fill)  { ctx.fillStyle=fill;   ctx.fill(); }
   if(stroke){ ctx.strokeStyle=stroke; ctx.lineWidth=strokeW||0.5; ctx.stroke(); }
 }
 
-// Clip to the current tile diamond.
 function clipDiamond(ctx, x, y){
   var hw = HW*zoom, hh = HH*zoom;
   ctx.beginPath();
@@ -77,9 +72,6 @@ function clipDiamond(ctx, x, y){
 }
 
 // ── Draw: isometric box ──────────────────────────────────────────
-// x,y  = north-vertex of the GROUND diamond.
-// bh   = height in unzoomed px.
-// tc   = top face colour, lc = left (NW) face, rc = right (NE) face.
 function isoBox(ctx, x, y, bh, tc, lc, rc){
   var hw=HW*zoom, hh=HH*zoom, zb=bh*zoom;
   // Left face (NW wall)
@@ -105,41 +97,33 @@ function isoBox(ctx, x, y, bh, tc, lc, rc){
   ctx.closePath(); ctx.fillStyle=tc; ctx.fill();
 }
 
-// ── Draw: gable roof (ridge runs col direction, east-west) ───────
+// ── Draw: gable roof EW ──────────────────────────────────────────
 function isoGableEW(ctx, x, y, bh, rh, tc, lc, rc){
   var hw=HW*zoom, hh=HH*zoom, zb=bh*zoom, zr=rh*zoom;
   var by=y-zb;
   var N={x:x,    y:by},        E={x:x+hw, y:by+hh};
   var S={x:x,    y:by+2*hh},   W={x:x-hw, y:by+hh};
   var RW={x:x-hw,y:by+hh-zr},  RE={x:x+hw,y:by+hh-zr};
-  // NW slope
   ctx.beginPath(); ctx.moveTo(W.x,W.y); ctx.lineTo(N.x,N.y); ctx.lineTo(RE.x,RE.y); ctx.lineTo(RW.x,RW.y); ctx.closePath(); ctx.fillStyle=lc; ctx.fill();
-  // SE slope
   ctx.beginPath(); ctx.moveTo(E.x,E.y); ctx.lineTo(S.x,S.y); ctx.lineTo(RW.x,RW.y); ctx.lineTo(RE.x,RE.y); ctx.closePath(); ctx.fillStyle=rc; ctx.fill();
-  // NE gable end
   ctx.beginPath(); ctx.moveTo(N.x,N.y); ctx.lineTo(E.x,E.y); ctx.lineTo(RE.x,RE.y); ctx.closePath(); ctx.fillStyle=tc; ctx.fill();
-  // SW gable end
   ctx.beginPath(); ctx.moveTo(S.x,S.y); ctx.lineTo(W.x,W.y); ctx.lineTo(RW.x,RW.y); ctx.closePath(); ctx.fillStyle=tc; ctx.fill();
 }
 
-// ── Draw: gable roof (ridge runs row direction, north-south) ─────
+// ── Draw: gable roof NS ──────────────────────────────────────────
 function isoGableNS(ctx, x, y, bh, rh, tc, lc, rc){
   var hw=HW*zoom, hh=HH*zoom, zb=bh*zoom, zr=rh*zoom;
   var by=y-zb;
   var N={x:x,  y:by},       E={x:x+hw, y:by+hh};
   var S={x:x,  y:by+2*hh},  W={x:x-hw, y:by+hh};
   var RN={x:x, y:by-zr},    RS={x:x,   y:by+2*hh-zr};
-  // NW slope
   ctx.beginPath(); ctx.moveTo(W.x,W.y); ctx.lineTo(N.x,N.y); ctx.lineTo(RN.x,RN.y); ctx.lineTo(RS.x,RS.y); ctx.closePath(); ctx.fillStyle=lc; ctx.fill();
-  // SE slope
   ctx.beginPath(); ctx.moveTo(E.x,E.y); ctx.lineTo(S.x,S.y); ctx.lineTo(RS.x,RS.y); ctx.lineTo(RN.x,RN.y); ctx.closePath(); ctx.fillStyle=rc; ctx.fill();
-  // NE gable end
   ctx.beginPath(); ctx.moveTo(N.x,N.y); ctx.lineTo(E.x,E.y); ctx.lineTo(RN.x,RN.y); ctx.closePath(); ctx.fillStyle=tc; ctx.fill();
-  // SW gable end
   ctx.beginPath(); ctx.moveTo(S.x,S.y); ctx.lineTo(W.x,W.y); ctx.lineTo(RS.x,RS.y); ctx.closePath(); ctx.fillStyle=tc; ctx.fill();
 }
 
-// ── Draw: hip (pyramid-peak) roof ────────────────────────────────
+// ── Draw: hip roof ───────────────────────────────────────────────
 function isoHipRoof(ctx, x, y, bh, rh, lc, rc){
   var hw=HW*zoom, hh=HH*zoom, zb=bh*zoom, zr=rh*zoom;
   var by=y-zb;
@@ -152,18 +136,16 @@ function isoHipRoof(ctx, x, y, bh, rh, lc, rc){
   ctx.beginPath(); ctx.moveTo(W.x,W.y); ctx.lineTo(N.x,N.y); ctx.lineTo(tip.x,tip.y); ctx.closePath(); ctx.fillStyle=lc; ctx.fill();
 }
 
-// ── Draw: cylinder (towers, silos) ───────────────────────────────
+// ── Draw: cylinder ───────────────────────────────────────────────
 function isoCylinder(ctx, x, y, bh, r, tc, bc){
   var zb=bh*zoom, zr=r*zoom;
-  var hw=HW*zoom, hh=HH*zoom;
-  var cx2=x, cy2=y+hh;  // centre of ground ellipse
-  // Body (left and right halves as gradient)
+  var hh=HH*zoom;
+  var cx2=x, cy2=y+hh;
   ctx.save();
   var grad=ctx.createLinearGradient(cx2-zr,cy2,cx2+zr,cy2);
   grad.addColorStop(0,   shadeC(bc,0.55));
   grad.addColorStop(0.4, bc);
   grad.addColorStop(1,   shadeC(bc,0.72));
-  // Approximate cylinder as thick vertical ellipse strip
   ctx.beginPath();
   ctx.ellipse(cx2, cy2-zb, zr, zr*0.5, 0, 0, Math.PI*2);
   ctx.fillStyle=tc; ctx.fill();
@@ -177,8 +159,6 @@ function isoCylinder(ctx, x, y, bh, r, tc, bc){
 }
 
 // ── Window helpers ────────────────────────────────────────────────
-// All u/v values are 0→1 fractions across the face.
-// Left face (NW wall): u=0 is W vertex, u=1 is N vertex; v=0 bottom, v=1 top.
 function winL(ctx, x, y, zbh, u, v, wu, vh, c){
   var hw=HW*zoom, hh=HH*zoom;
   var ax=x-hw, ay=y+hh;
@@ -189,7 +169,7 @@ function winL(ctx, x, y, zbh, u, v, wu, vh, c){
   ctx.lineTo(ax+u*hw,        ay-u*hh        -(v+vh)*zbh);
   ctx.closePath(); ctx.fillStyle=c; ctx.fill();
 }
-// Right face (NE wall): u=0 is N vertex, u=1 is E vertex; v=0 bottom, v=1 top.
+
 function winR(ctx, x, y, zbh, u, v, wu, vh, c){
   var hw=HW*zoom, hh=HH*zoom;
   ctx.beginPath();
@@ -209,6 +189,7 @@ function shadeC(hex, f){
     return Math.round(Math.max(0,Math.min(255,v*f))).toString(16).padStart(2,'0');
   }).join('');
 }
+
 function mixC(a,b,t){
   var ar=parseInt(a.slice(1,3),16),ag=parseInt(a.slice(3,5),16),ab_=parseInt(a.slice(5,7),16);
   var br=parseInt(b.slice(1,3),16),bg=parseInt(b.slice(3,5),16),bb=parseInt(b.slice(5,7),16);
@@ -217,8 +198,7 @@ function mixC(a,b,t){
   }).join('');
 }
 
-// ── Render-order sort (painter's algorithm) ──────────────────────
-// Tiles closer to viewer (larger c+r) must be drawn later.
+// ── Render-order sort ────────────────────────────────────────────
 function renderSortKey(c,r){ return c+r; }
 
 // ── Night overlay ────────────────────────────────────────────────
@@ -235,7 +215,7 @@ function render(){
   if(!gctx) return;
   gctx.clearRect(0,0,cw,ch);
 
-  // Sky / background gradient
+  // Sky background
   if(nightMode){
     var sky=gctx.createLinearGradient(0,0,0,ch);
     sky.addColorStop(0,'#010510'); sky.addColorStop(1,'#030c1e');
@@ -246,29 +226,32 @@ function render(){
     gctx.fillStyle=sky2; gctx.fillRect(0,0,cw,ch);
   }
 
-  // Build sorted tile list
+  // Build sorted tile list (painter's order: small c+r first)
   var tileList=[];
-  for(var r=0;r<ROWS;r++){
-    for(var c=0;c<COLS;c++){
-      tileList.push([c,r]);
+  for(var r2=0;r2<ROWS;r2++){
+    for(var c2=0;c2<COLS;c2++){
+      tileList.push([c2,r2]);
     }
   }
-  // Painter's order: small c+r first
   tileList.sort(function(a,b){ return (a[0]+a[1])-(b[0]+b[1]); });
 
+  // ── Pass 1: 全タイルの地面を先に描く ────────────────────────────
+  // これにより隣タイルの地面がビルの壁を上書きしなくなる
   tileList.forEach(function(cr){
     var c=cr[0], r=cr[1];
     var s=cellToScreen(c,r);
-    var x=s.x, y=s.y;
+    var gfill  = nightMode ? '#0c1f12' : '#1a3a20';
+    var gstroke= showGrid  ? (nightMode?'rgba(255,255,255,0.05)':'rgba(255,255,255,0.08)') : null;
+    drawDiamond(gctx, s.x, s.y, gfill, gstroke, 0.5);
+  });
+
+  // ── Pass 2: 全ブロックを地面の上に描く ──────────────────────────
+  tileList.forEach(function(cr){
+    var c=cr[0], r=cr[1];
     var cell=getCell(c,r);
-
-    // Ground tile
-    var gfill = nightMode ? '#0c1f12' : '#1a3a20';
-    var gstroke= showGrid ? (nightMode?'rgba(255,255,255,0.05)':'rgba(255,255,255,0.08)') : null;
-    drawDiamond(gctx, x, y, gfill, gstroke, 0.5);
-
     if(cell){
-      drawBlock(gctx, c, r, x, y, cell.id, cell.dir);
+      var s=cellToScreen(c,r);
+      drawBlock(gctx, c, r, s.x, s.y, cell.id, cell.dir);
     }
   });
 
@@ -296,8 +279,7 @@ function drawBlock(ctx, c, r, x, y, id, dir){
 function drawGeneric(ctx, x, y, id, dir, b){
   var bh=b.bh||30;
   isoBox(ctx,x,y,bh,'#3a5a4a','#2a4a38','#1e3028');
-  // emoji label centred on top face
-  var hw=HW*zoom, hh=HH*zoom;
+  var hh=HH*zoom;
   var fs=Math.max(8,Math.min(22,zoom*18));
   ctx.save();
   ctx.font=fs+'px serif';
