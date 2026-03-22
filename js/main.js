@@ -1,24 +1,22 @@
-/**
- * main.js
- * App entry point: canvas setup, resize handling, DOMContentLoaded init.
- */
+// main.js
+// App entry point: canvas setup, resize handling, DOMContentLoaded init.
 
 function resizeCanvas(){
-  var wrap=document.getElementById('canvas-wrap');
-  cw=wrap.clientWidth;
-  ch=wrap.clientHeight;
-  gc.width=cw; gc.height=ch;
-  ov.width=cw; ov.height=ch;
+  var wrap = document.getElementById('canvas-wrap');
+  cw = wrap.clientWidth;
+  ch = wrap.clientHeight;
+  gc.width = cw; gc.height = ch;
+  ov.width = cw; ov.height = ch;
   scheduleRender();
 }
 
 function init(){
-  gc=document.getElementById('gc');
-  ov=document.getElementById('ov');
-  gctx=gc.getContext('2d');
-  octx=ov.getContext('2d');
-  cw=gc.clientWidth; ch=gc.clientHeight;
-
+  gc    = document.getElementById('gc');
+  ov    = document.getElementById('ov');
+  gctx  = gc.getContext('2d');
+  octx  = ov.getContext('2d');
+  cw    = gc.clientWidth;
+  ch    = gc.clientHeight;
   resizeCanvas();
 
   // Patch drawBlock to handle roads properly (from roads-draw.js)
@@ -36,10 +34,13 @@ function init(){
   initUI();
   initInteraction();
 
-  // Night mode default ON
+  // 夜間モード デフォルトON
   nightMode = true;
-  document.getElementById('btn-night').classList.add('on');
-  document.getElementById('btn-night').textContent = '☀昼';
+  var nightBtn = document.getElementById('settings-night');
+  if(nightBtn){
+    nightBtn.classList.add('on');
+    nightBtn.textContent = 'ON';
+  }
   document.body.classList.add('night-mode');
 
   // First render
