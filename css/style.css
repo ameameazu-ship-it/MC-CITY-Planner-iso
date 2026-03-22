@@ -36,16 +36,16 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
   display:flex;
   align-items:center;
   gap:6px;
-  padding:6px 8px;
-  padding-right:96px; /* 一覧円のスペース確保 */
-  padding-bottom:calc(6px + env(safe-area-inset-bottom));
+  padding:4px 8px;
+  padding-right:82px;
+  padding-bottom:calc(4px + env(safe-area-inset-bottom));
   background:linear-gradient(0deg,#0d2035,#071828);
   border-top:2px solid var(--gold);
   flex-shrink:0;
-  min-height:64px;
+  min-height:54px;
   touch-action:manipulation;
   position:relative;
-  overflow:visible; /* 円がバーからはみ出せるように */
+  overflow:visible;
 }
 
 /* ── 選択中ブロック表示（クリック不可・フラット） */
@@ -82,7 +82,7 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
 /* ── 中央3ボタン（従来デザイン） */
 .bb-btn{
   min-width:0;
-  min-height:48px;
+  min-height:42px;
   border:1.5px solid var(--border);
   border-radius:10px;
   background:linear-gradient(180deg,#0f2a42,#071828);
@@ -93,12 +93,12 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
   align-items:center;
   justify-content:center;
   flex-direction:column;
-  gap:3px;
+  gap:2px;
   flex:1;
   transition:all .15s;
   box-shadow:0 2px 6px rgba(0,0,0,.4);
   touch-action:manipulation;
-  padding:4px 2px;
+  padding:3px 2px;
 }
 .bb-btn:active{transform:scale(.93);}
 .bb-btn.active{
@@ -116,13 +116,13 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
 /* ── 一覧ボタン（円・右端から飛び出す） */
 #parts-btn{
   position:absolute;
-  right:-18px;
+  right:-16px;
   top:50%;
   transform:translateY(calc(-50% - env(safe-area-inset-bottom, 0px) / 2));
-  width:112px;
-  height:112px;
+  width:96px;
+  height:96px;
   border-radius:50%;
-  background:linear-gradient(180deg,#3a4a6a,#1a2a40);
+  background:linear-gradient(180deg,#0f2a42,#071828);
   border:2.5px solid var(--gold);
   color:var(--gold);
   display:flex;
@@ -132,9 +132,9 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
   cursor:pointer;
   z-index:10;
   touch-action:manipulation;
-  gap:4px;
+  gap:3px;
   flex-shrink:0;
-  box-shadow:-4px 0 20px rgba(0,0,0,.6);
+  box-shadow:none;
   transition:all .15s;
 }
 #parts-btn:active{
