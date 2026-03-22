@@ -264,9 +264,15 @@ function initPartsPopOnTouch(){
 
 function closeSheet(){
   sheetOpen = false;
+  var pb = document.getElementById('parts-btn');
+  // シートのtransition(0.3s)が終わるまで円を隠す
+  if(pb) pb.style.opacity = '0';
   document.getElementById('sheet').classList.remove('open');
   document.getElementById('sheet-backdrop').style.display = 'none';
-  document.getElementById('parts-btn').classList.remove('open-state');
+  if(pb) pb.classList.remove('open-state');
+  setTimeout(function(){
+    if(pb) pb.style.opacity = '';
+  }, 320);
 }
 
 function toggleSheet(){ sheetOpen ? closeSheet() : openSheet(); }
@@ -395,4 +401,15 @@ function initUI(){
 
   // iOS touch対応
   initPartsPopOnTouch();
+
+  // 上部バーボタンのクリックアニメーション（iOS含む）
+  document.querySelectorAll('.tb-btn').forEach(function(btn){
+    function pop(){
+      btn.classList.remove('popping');
+      void btn.offsetWidth;
+      btn.classList.add('popping');
+    }
+    btn.addEventListener('touchstart', pop, {passive:true});
+    btn.addEventListener('mousedown',  pop);
+  });
 }
