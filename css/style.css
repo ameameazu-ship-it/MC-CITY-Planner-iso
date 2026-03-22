@@ -9,9 +9,9 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
   --surface:#071828;
   --border:#1a4060;
   --text:#d4eaf7;
-  --dim:#5a8aaa;
+  --dim:#5a8aaa;a
 }
-
+a
 /* ===== APP SHELL ===== */
 #app{display:flex;flex-direction:column;height:100dvh;background:var(--bg);overflow:hidden;padding-top:env(safe-area-inset-top);}
 
@@ -135,14 +135,37 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
   gap:3px;
   flex-shrink:0;
   box-shadow:none;
-  transition:all .15s;
+  transition:transform .18s cubic-bezier(.34,1.56,.64,1), border-color .15s, background .15s;
+  -webkit-tap-highlight-color:transparent;
 }
 #parts-btn:active{
-  transform:translateY(calc(-50% - env(safe-area-inset-bottom, 0px) / 2)) scale(.93);
+  transform:translateY(calc(-50% - env(safe-area-inset-bottom, 0px) / 2)) scale(.82);
+  background:linear-gradient(180deg,#071828,#071828);
+  border-color:#ffe066;
+}
+@keyframes parts-pop{
+  0%  { transform:translateY(calc(-50% - env(safe-area-inset-bottom,0px)/2)) scale(.78); border-color:#ffe066; }
+  45% { transform:translateY(calc(-50% - env(safe-area-inset-bottom,0px)/2)) scale(1.14); border-color:#fff8aa; }
+  65% { transform:translateY(calc(-50% - env(safe-area-inset-bottom,0px)/2)) scale(.96); border-color:#f5c842; }
+  82% { transform:translateY(calc(-50% - env(safe-area-inset-bottom,0px)/2)) scale(1.04); }
+  100%{ transform:translateY(calc(-50% - env(safe-area-inset-bottom,0px)/2)) scale(1);   border-color:#f5c842; }
+}
+@keyframes grid-spin{
+  0%  { transform:rotate(0deg)   scale(1); }
+  30% { transform:rotate(22deg)  scale(1.18); }
+  60% { transform:rotate(-10deg) scale(.95); }
+  80% { transform:rotate(5deg)   scale(1.04); }
+  100%{ transform:rotate(0deg)   scale(1); }
+}
+#parts-btn.popping{
+  animation:parts-pop .42s cubic-bezier(.34,1.56,.64,1) forwards;
+}
+#parts-btn.popping svg{
+  animation:grid-spin .42s cubic-bezier(.34,1.56,.64,1) forwards;
 }
 #parts-btn.open-state{
   border-color:var(--gold);
-  background:linear-gradient(180deg,#4a5a7a,#2a3a50);
+  background:linear-gradient(180deg,#0f2a42,#071828);
 }
 #parts-btn #lbl-list{
   font-size:11px;
