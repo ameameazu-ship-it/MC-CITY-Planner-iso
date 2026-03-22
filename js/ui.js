@@ -22,7 +22,8 @@ var I18N = {
     s_sound:'🔊 配置音',     s_sound_desc:'ブロック配置時の効果音',
     s_vibe:'📳 バイブ',      s_vibe_desc:'タップ時の振動フィードバック',
     s_grid:'⊞ グリッド',    s_grid_desc:'グリッド線の表示',
-    s_lang:'🌐 言語',        s_lang_desc:'表示言語を選択'
+    s_lang:'🌐 言語',        s_lang_desc:'表示言語を選択',
+    s_bg:'🎨 背景色',        s_bg_desc:'マップの地面・空の色'
   },
   en:{
     draw:'Draw', erase:'Erase', fill:'Fill', list:'List',
@@ -37,7 +38,8 @@ var I18N = {
     s_sound:'🔊 Sound',       s_sound_desc:'Sound effect on block placement',
     s_vibe:'📳 Vibrate',      s_vibe_desc:'Haptic feedback on tap',
     s_grid:'⊞ Grid',         s_grid_desc:'Show grid lines',
-    s_lang:'🌐 Language',     s_lang_desc:'Select display language'
+    s_lang:'🌐 Language',     s_lang_desc:'Select display language',
+    s_bg:'🎨 Background',     s_bg_desc:'Ground & sky color of the map'
   },
   zh:{
     draw:'绘制', erase:'删除', fill:'填充', list:'列表',
@@ -52,7 +54,8 @@ var I18N = {
     s_sound:'🔊 音效',       s_sound_desc:'放置方块时的音效',
     s_vibe:'📳 振动',        s_vibe_desc:'点按时的触觉反馈',
     s_grid:'⊞ 网格',        s_grid_desc:'显示网格线',
-    s_lang:'🌐 语言',        s_lang_desc:'选择显示语言'
+    s_lang:'🌐 语言',        s_lang_desc:'选择显示语言',
+    s_bg:'🎨 背景色',        s_bg_desc:'地图的地面和天空颜色'
   },
   ko:{
     draw:'그리기', erase:'지우기', fill:'채우기', list:'목록',
@@ -67,7 +70,8 @@ var I18N = {
     s_sound:'🔊 효과음',     s_sound_desc:'블록 배치 시 효과음',
     s_vibe:'📳 진동',        s_vibe_desc:'탭 시 진동 피드백',
     s_grid:'⊞ 그리드',      s_grid_desc:'그리드 선 표시',
-    s_lang:'🌐 언어',        s_lang_desc:'표시 언어 선택'
+    s_lang:'🌐 언어',        s_lang_desc:'표시 언어 선택',
+    s_bg:'🎨 배경색',        s_bg_desc:'맵의 지면·하늘 색상'
   },
   es:{
     draw:'Dibujar', erase:'Borrar', fill:'Rellenar', list:'Lista',
@@ -82,7 +86,8 @@ var I18N = {
     s_sound:'🔊 Sonido',      s_sound_desc:'Efecto al colocar bloques',
     s_vibe:'📳 Vibración',    s_vibe_desc:'Vibración táctil al tocar',
     s_grid:'⊞ Cuadrícula',   s_grid_desc:'Mostrar líneas de cuadrícula',
-    s_lang:'🌐 Idioma',       s_lang_desc:'Seleccionar idioma'
+    s_lang:'🌐 Idioma',       s_lang_desc:'Seleccionar idioma',
+    s_bg:'🎨 Fondo',          s_bg_desc:'Color del suelo y el cielo'
   },
   fr:{
     draw:'Dessiner', erase:'Effacer', fill:'Remplir', list:'Liste',
@@ -97,7 +102,8 @@ var I18N = {
     s_sound:'🔊 Son',          s_sound_desc:'Effet sonore lors du placement',
     s_vibe:'📳 Vibration',     s_vibe_desc:'Retour haptique au toucher',
     s_grid:'⊞ Grille',        s_grid_desc:'Afficher les lignes de grille',
-    s_lang:'🌐 Langue',        s_lang_desc:'Sélectionner la langue'
+    s_lang:'🌐 Langue',        s_lang_desc:'Sélectionner la langue',
+    s_bg:'🎨 Fond',            s_bg_desc:'Couleur du sol et du ciel'
   },
   id:{
     draw:'Gambar', erase:'Hapus', fill:'Isi', list:'Daftar',
@@ -112,7 +118,8 @@ var I18N = {
     s_sound:'🔊 Suara',        s_sound_desc:'Efek suara saat meletakkan blok',
     s_vibe:'📳 Getar',         s_vibe_desc:'Umpan balik getar saat mengetuk',
     s_grid:'⊞ Kisi',          s_grid_desc:'Tampilkan garis kisi',
-    s_lang:'🌐 Bahasa',        s_lang_desc:'Pilih bahasa tampilan'
+    s_lang:'🌐 Bahasa',        s_lang_desc:'Pilih bahasa tampilan',
+    s_bg:'🎨 Latar belakang',  s_bg_desc:'Warna tanah dan langit peta'
   },
   hi:{
     draw:'बनाएं', erase:'मिटाएं', fill:'भरें', list:'सूची',
@@ -127,7 +134,8 @@ var I18N = {
     s_sound:'🔊 ध्वनि',        s_sound_desc:'ब्लॉक रखने पर ध्वनि प्रभाव',
     s_vibe:'📳 कंपन',          s_vibe_desc:'टैप पर कंपन प्रतिक्रिया',
     s_grid:'⊞ ग्रिड',         s_grid_desc:'ग्रिड रेखाएं दिखाएं',
-    s_lang:'🌐 भाषा',          s_lang_desc:'प्रदर्शन भाषा चुनें'
+    s_lang:'🌐 भाषा',          s_lang_desc:'प्रदर्शन भाषा चुनें',
+    s_bg:'🎨 पृष्ठभूमि',      s_bg_desc:'मानचित्र की भूमि और आकाश का रंग'
   }
 };
 
@@ -151,7 +159,7 @@ function applyLang(newLang){
   var elCtr  = document.getElementById('lbl-center');     if(elCtr)      elCtr.textContent      = t('center');
   var elSet  = document.getElementById('lbl-settings');   if(elSet)      elSet.textContent      = t('settings');
 
-  // ── Bottom bar (span.bb-lbl) ── ★ここが重要な修正
+  // ── Bottom bar (span.bb-lbl) ──
   var elDraw  = document.getElementById('lbl-draw');   if(elDraw)  elDraw.textContent  = t('draw');
   var elErase = document.getElementById('lbl-erase');  if(elErase) elErase.textContent = t('erase');
   var elFill  = document.getElementById('lbl-fill');   if(elFill)  elFill.textContent  = t('fill');
@@ -162,6 +170,7 @@ function applyLang(newLang){
   setText('lbl-s-sound',  t('s_sound'));       setText('desc-s-sound',  t('s_sound_desc'));
   setText('lbl-s-vibe',   t('s_vibe'));        setText('desc-s-vibe',   t('s_vibe_desc'));
   setText('lbl-s-grid',   t('s_grid'));        setText('desc-s-grid',   t('s_grid_desc'));
+  setText('lbl-s-bg',     t('s_bg'));          setText('desc-s-bg',     t('s_bg_desc'));
   setText('lbl-s-lang',   t('s_lang'));        setText('desc-s-lang',   t('s_lang_desc'));
 
   var ph = document.getElementById('field-name-input'); if(ph) ph.placeholder = t('save_ph');
@@ -337,6 +346,40 @@ function toggleNight(){
   scheduleRender();
 }
 
+// ── Background Color Switcher ─────────────────────────────────────
+var BG_KEY = 'mc_planner_bg';
+
+function applyBg(bg){
+  // 既存の bg-xxx クラスを全除去してから付与
+  var classes = Array.from(document.body.classList);
+  classes.forEach(function(cls){
+    if(cls.startsWith('bg-')) document.body.classList.remove(cls);
+  });
+  document.body.classList.add('bg-' + bg);
+
+  // スウォッチの active 更新
+  document.querySelectorAll('.bg-swatch').forEach(function(b){
+    b.classList.toggle('active', b.dataset.bg === bg);
+  });
+
+  // キャンバス再描画
+  if(typeof scheduleRender === 'function') scheduleRender();
+}
+
+function initBgSwatches(){
+  // 保存済み設定を復元（なければ default）
+  var saved = localStorage.getItem(BG_KEY) || 'default';
+  applyBg(saved);
+
+  document.querySelectorAll('.bg-swatch').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var bg = btn.dataset.bg;
+      applyBg(bg);
+      localStorage.setItem(BG_KEY, bg);
+    });
+  });
+}
+
 // ── Toggle helpers ────────────────────────────────────────────────
 function bindToggle(id, onCb){
   var btn = document.getElementById(id); if(!btn) return;
@@ -390,6 +433,9 @@ function initUI(){
   bindToggle('settings-sound', function(v){ soundOn = v; });
   bindToggle('settings-vibe',  function(v){ vibeOn  = v; });
   bindToggle('settings-grid',  function(v){ showGrid = v; scheduleRender(); });
+
+  // 背景色スウォッチ
+  initBgSwatches();
 
   // コンテキストメニュー
   document.querySelectorAll('.ctx-dir-btn').forEach(function(btn){
