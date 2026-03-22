@@ -35,7 +35,7 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
 
 /* ===== MAIN AREA ===== */
 #main-area{flex:1;position:relative;overflow:hidden;display:flex;flex-direction:column;}
-#canvas-wrap{flex:1;overflow:hidden;background:#030c1a;position:relative;touch-action:none;outline:none;}
+#canvas-wrap{flex:1;overflow:hidden;background:#030c1a;position:relative;touch-action:none;outline:none;transition:background .35s ease;}
 #gc{display:block;touch-action:none;position:absolute;top:0;left:0;}
 #ov{display:block;pointer-events:none;position:absolute;top:0;left:0;}
 
@@ -230,3 +230,45 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
 /* ===== NIGHT MODE ===== */
 body.night-mode #canvas-wrap{background:#010508;}
 .tb-btn.night-active{background:linear-gradient(180deg,#1a1a4a,#0a0a2a)!important;border-color:#6060dd!important;color:#aaaaff!important;}
+
+/* ===== BACKGROUND COLOR SWATCHES ===== */
+.bg-swatches{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+  padding:2px 0;
+}
+.bg-swatch{
+  width:28px;
+  height:28px;
+  border-radius:50%;
+  border:2px solid transparent;
+  cursor:pointer;
+  transition:border-color .15s, transform .12s, box-shadow .15s;
+  flex-shrink:0;
+  position:relative;
+}
+.bg-swatch:active{ transform:scale(.88); }
+.bg-swatch.active{
+  border-color:#fff;
+  box-shadow:0 0 0 2px var(--gold);
+}
+/* スウォッチ本体の色 */
+.bg-swatch[data-bg="default"] { background:linear-gradient(135deg,#030c1a,#071828); }
+.bg-swatch[data-bg="grass"]   { background:linear-gradient(135deg,#2e5e3a,#1a3d24); }
+.bg-swatch[data-bg="desert"]  { background:linear-gradient(135deg,#b8945a,#8c6a38); }
+.bg-swatch[data-bg="snow"]    { background:linear-gradient(135deg,#c2dff0,#8ab8d8); }
+.bg-swatch[data-bg="ocean"]   { background:linear-gradient(135deg,#0d3d6b,#061f3a); }
+.bg-swatch[data-bg="stone"]   { background:linear-gradient(135deg,#555565,#36364a); }
+
+/* canvas-wrap 背景色テーマ */
+body.bg-default #canvas-wrap { background:#030c1a; }
+body.bg-grass   #canvas-wrap { background:#1e3d28; }
+body.bg-desert  #canvas-wrap { background:#7a5c30; }
+body.bg-snow    #canvas-wrap { background:#8ab8d8; }
+body.bg-ocean   #canvas-wrap { background:#061f3a; }
+body.bg-stone   #canvas-wrap { background:#2c2c3c; }
+
+/* 夜間モード時は背景を暗くオーバーライド（共存） */
+body.night-mode #canvas-wrap { background:#010508 !important; }
