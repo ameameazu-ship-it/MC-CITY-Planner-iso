@@ -15,14 +15,15 @@ var gc, ov, gctx, octx, cw, ch;
 // ── Background theme ─────────────────────────────────────────────
 var bgTheme = 'default';
 
-// テーマごとのカラーパレット: [空グラデ上, 空グラデ下, 地面(昼), 地面(夜)]
+// テーマごとのカラーパレット: [空グラデ上, 空グラデ下, 地面(昼), 地面(夜), グリッド線]
 var BG_THEMES = {
-  'default': ['#0a1f3a', '#051020', '#1a3a20', '#0c1f12'],
-  'grass'  : ['#0d3318', '#061a0a', '#2e5a30', '#0e2410'],
-  'desert' : ['#3a2408', '#1e1004', '#8c6030', '#4a3010'],
-  'snow'   : ['#1a2a40', '#0a1628', '#7aaccc', '#3a607a'],
-  'ocean'  : ['#040e22', '#020810', '#0a3060', '#050f28'],
-  'stone'  : ['#111118', '#080810', '#48485a', '#242430']
+  //            空top       空bot       地面昼      地面夜      グリッド線
+  'default': ['#0a1f3a', '#051020', '#1a3a20', '#0c1f12', 'rgba(255,255,255,0.12)'],
+  'grass'  : ['#0e4020', '#061a08', '#2e5a30', '#0e2410', 'rgba(255,255,255,0.12)'],
+  'desert' : ['#5a3010', '#2e1808', '#8c6030', '#4a3010', 'rgba(0,0,0,0.20)'],
+  'snow'   : ['#4a7aaa', '#1e3a60', '#7aaccc', '#3a607a', 'rgba(20,50,90,0.30)'],
+  'ocean'  : ['#040e22', '#020810', '#0a3060', '#050f28', 'rgba(255,255,255,0.14)'],
+  'stone'  : ['#1e1e28', '#0c0c14', '#48485a', '#242430', 'rgba(255,255,255,0.11)']
 };
 
 function getBgPalette(){
@@ -232,12 +233,14 @@ function render(){
   if(!gctx) return;
   gctx.clearRect(0,0,cw,ch);
 
-  var pal = getBgPalette(); // [空top, 空bot, 地面昼, 地面夜]
+  var pal = getBgPalette(); // [空top, 空bot, 地面昼, 地面夜, グリッド]
 
   // Sky background
   if(nightMode){
+    // 夜間もテーマ色を暗く反映
     var sky=gctx.createLinearGradient(0,0,0,ch);
-    sky.addColorStop(0,'#010510'); sky.addColorStop(1,'#030c1e');
+    sky.addColorStop(0, shadeC(pal[0], 0.28));
+    sky.addColorStop(1, shadeC(pal[1], 0.22));
     gctx.fillStyle=sky; gctx.fillRect(0,0,cw,ch);
   } else {
     var sky2=gctx.createLinearGradient(0,0,0,ch);
@@ -259,7 +262,7 @@ function render(){
     var c=cr[0], r=cr[1];
     var s=cellToScreen(c,r);
     var gfill  = nightMode ? pal[3] : pal[2];
-    var gstroke= showGrid  ? (nightMode?'rgba(255,255,255,0.05)':'rgba(255,255,255,0.08)') : null;
+    var gstroke= showGrid  ? (nightMode ? 'rgba(255,255,255,0.06)' : pal[4]) : null;
     drawDiamond(gctx, s.x, s.y, gfill, gstroke, 0.5);
   });
 
