@@ -88,19 +88,22 @@ function floodFill(c,r){
 
 // ── Sound ─────────────────────────────────────────────────────────
 var _audioCtx = null;
+var _audioReady = false;
 
-// 最初のユーザー操作時にAudioContextを初期化（Autoplay Policy対策）
-function _initAudioCtx(){
-  if(_audioCtx) return;
+// document全体の最初のpointerdownでAudioContextをunlock（最も確実な方法）
+function _unlockAudio(){
+  if(_audioReady) return;
   try{
     _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    _audioCtx.resume().then(function(){ _audioReady = true; });
   }catch(e){}
 }
+document.addEventListener('pointerdown', _unlockAudio, {once:true});
+document.addEventListener('touchend',    _unlockAudio, {once:true});
 
 function playPlaceSound(){
+  if(!_audioReady || !_audioCtx) return;
   try {
-    if(!_audioCtx) return;
-    if(_audioCtx.state === 'suspended') _audioCtx.resume();
     var osc = _audioCtx.createOscillator(), g = _audioCtx.createGain();
     osc.connect(g); g.connect(_audioCtx.destination);
     osc.frequency.value = 440 + Math.random() * 160;
@@ -176,7 +179,6 @@ function initInteraction(){
 // ── Touch handlers ────────────────────────────────────────────────
 function onTouchStart(e){
   e.preventDefault();
-  _initAudioCtx(); // 最初のタッチでAudioContextを初期化
   var touches=e.touches;
 
   if(touches.length===2){
@@ -255,7 +257,6 @@ function onTouchEnd(e){
 // ── Mouse handlers ────────────────────────────────────────────────
 function onMouseDown(e){
   if(e.button!==0) return;
-  _initAudioCtx(); // 最初のクリックでAudioContextを初期化
   var cell=screenToCell(e.offsetX,e.offsetY);
   if(tool==='fill'){ pushUndo(); floodFill(cell.c,cell.r); return; }
   isPointerDown=true;
