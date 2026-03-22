@@ -34,16 +34,17 @@ function init(){
   initUI();
   initInteraction();
 
-  // 夜間モード デフォルトON
-  nightMode = true;
+  // 夜間モード デフォルトOFF
+  nightMode = false;
   var nightBtn = document.getElementById('settings-night');
   if(nightBtn){
-    nightBtn.classList.add('on');
-    nightBtn.textContent = 'ON';
+    nightBtn.classList.remove('on');
+    nightBtn.textContent = 'OFF';
   }
-  document.body.classList.add('night-mode');
+  document.body.classList.remove('night-mode');
 
-  // First render
+  // First render：dirty初期値がtrueのためscheduleRenderが機能しない問題を回避
+  dirty = false;
   scheduleRender();
 
   window.addEventListener('resize', resizeCanvas);
