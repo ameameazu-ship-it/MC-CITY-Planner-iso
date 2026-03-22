@@ -44,12 +44,12 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
   display:flex;
   align-items:center;
   gap:6px;
-  padding:4px 86px 4px 8px;
-  padding-bottom:calc(4px + env(safe-area-inset-bottom));
+  padding:2px 76px 2px 8px;
+  padding-bottom:calc(2px + env(safe-area-inset-bottom));
   background:linear-gradient(0deg,#0d2035,#071828);
   border-top:2px solid var(--gold);
   flex-shrink:0;
-  min-height:54px;
+  min-height:46px;
   touch-action:manipulation;
 }
 /* ── 選択中ブロック表示（クリック不可・フラット） */
@@ -60,7 +60,7 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
   justify-content:center;
   flex-shrink:0;
   min-width:54px;
-  padding:4px 4px;
+  padding:2px 4px;
   pointer-events:none;  /* クリック不可 */
   user-select:none;
   cursor:default;
@@ -87,7 +87,7 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
 .bb-btn{
   min-width:0;
   max-width:120px;
-  min-height:42px;
+  min-height:36px;
   border:1.5px solid var(--border);
   border-radius:10px;
   background:linear-gradient(180deg,#0f2a42,#071828);
@@ -103,7 +103,7 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
   transition:all .15s;
   box-shadow:0 2px 6px rgba(0,0,0,.4);
   touch-action:manipulation;
-  padding:3px 2px;
+  padding:2px 2px;
 }
 .bb-btn:active{transform:scale(.93);}
 .bb-btn.active{
@@ -122,9 +122,9 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
 #parts-btn{
   position:fixed;
   right:-16px;
-  bottom:calc(env(safe-area-inset-bottom) - 20px);
-  width:96px;
-  height:96px;
+  bottom:calc(env(safe-area-inset-bottom) - 18px);
+  width:82px;
+  height:82px;
   border-radius:50%;
   background:linear-gradient(180deg,#0f2a42,#071828);
   border:2.5px solid var(--gold);
