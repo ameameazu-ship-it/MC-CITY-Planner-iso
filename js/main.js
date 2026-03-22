@@ -3,10 +3,12 @@
 
 function resizeCanvas(){
   var wrap = document.getElementById('canvas-wrap');
-  cw = wrap.clientWidth;
-  ch = wrap.clientHeight;
-  gc.width = cw; gc.height = ch;
-  ov.width = cw; ov.height = ch;
+  cw = wrap.offsetWidth;
+  ch = wrap.offsetHeight;
+  gc.width  = cw; gc.height  = ch;
+  gc.style.width  = cw + 'px'; gc.style.height  = ch + 'px';
+  ov.width  = cw; ov.height  = ch;
+  ov.style.width  = cw + 'px'; ov.style.height  = ch + 'px';
   scheduleRender();
 }
 
@@ -15,8 +17,8 @@ function init(){
   ov    = document.getElementById('ov');
   gctx  = gc.getContext('2d');
   octx  = ov.getContext('2d');
-  cw    = gc.clientWidth;
-  ch    = gc.clientHeight;
+  cw    = gc.offsetWidth;
+  ch    = gc.offsetHeight;
   resizeCanvas();
 
   // Patch drawBlock to handle roads properly (from roads-draw.js)
