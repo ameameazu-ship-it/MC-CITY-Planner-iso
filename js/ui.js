@@ -320,20 +320,26 @@ function bindToggle(id, onCb){
 }
 
 // ── Init UI ───────────────────────────────────────────────────────
+// 安全なaddEventListener：要素がnullでもクラッシュしない
+function on(id, ev, fn){
+  var el = document.getElementById(id);
+  if(el) el.addEventListener(ev, fn);
+}
+
 function initUI(){
   buildSheet();
 
-  document.getElementById('parts-btn').addEventListener('click', toggleSheet);
-  document.getElementById('sheet-backdrop').addEventListener('click', closeSheet);
-  document.getElementById('btn-settings').addEventListener('click', openSettings);
-  document.getElementById('settings-backdrop').addEventListener('click', closeSettings);
-  document.getElementById('settings-close').addEventListener('click', closeSettings);
+  on('parts-btn',          'click', toggleSheet);
+  on('sheet-backdrop',     'click', closeSheet);
+  on('btn-settings',       'click', openSettings);
+  on('settings-backdrop',  'click', closeSettings);
+  on('settings-close',     'click', closeSettings);
 
   document.querySelectorAll('.lang-btn').forEach(function(btn){
     btn.addEventListener('click', function(){ applyLang(btn.dataset.lang); });
   });
 
-  document.getElementById('settings-save').addEventListener('click', function(){
+  on('settings-save', 'click', function(){
     var name = (document.getElementById('field-name-input').value || '').trim();
     if(!name){ alert(t('save_ph')); return; }
     if(saveMap(name)){
@@ -342,24 +348,24 @@ function initUI(){
     }
   });
 
-  document.getElementById('settings-clear').addEventListener('click', function(){
+  on('settings-clear', 'click', function(){
     if(!confirm(t('confirm_clear'))) return;
     cells = {};
     closeSettings();
     scheduleRender();
   });
 
-  // Night mode from settings panel
-  document.getElementById('settings-night').addEventListener('click', toggleNight);
+  // 夜間モード（設定パネル内）
+  on('settings-night', 'click', toggleNight);
 
   bindToggle('settings-sound', function(v){ soundOn = v; });
   bindToggle('settings-vibe',  function(v){ vibeOn  = v; });
   bindToggle('settings-grid',  function(v){ showGrid = v; scheduleRender(); });
 
-  // Context menu
+  // コンテキストメニュー
   document.querySelectorAll('.ctx-dir-btn').forEach(function(btn){
     btn.addEventListener('click', function(){ setDir(btn.dataset.dir); });
   });
-  document.getElementById('ctx-delete').addEventListener('click', ctxDelete);
-  document.getElementById('ctx-close').addEventListener('click', closeCtxMenu);
+  on('ctx-delete', 'click', ctxDelete);
+  on('ctx-close',  'click', closeCtxMenu);
 }
