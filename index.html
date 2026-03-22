@@ -3,72 +3,115 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#020b18">
 <title>MC City Planner ISO</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-
 <div id="app">
+
+  <!-- ===== TOP BAR ===== -->
   <div id="topbar">
     <div id="topbar-btns">
       <span class="title">⬡ MC CITY ISO</span>
-      <button class="tb-btn" id="btn-undo">↩戻す</button>
-      <button class="tb-btn" id="btn-redo">↪進む</button>
+      <button class="tb-btn" id="btn-undo">↩<span id="lbl-undo">戻す</span></button>
+      <button class="tb-btn" id="btn-redo">↪<span id="lbl-redo">進む</span></button>
       <button class="tb-btn" id="btn-zi">＋</button>
       <button class="tb-btn" id="btn-zo">－</button>
-      <button class="tb-btn" id="btn-center">⌖中心</button>
-      <button class="tb-btn on" id="btn-night">🌙夜</button>
-      <button class="tb-btn" id="btn-settings">⚙設定</button>
+      <button class="tb-btn" id="btn-center"><span id="lbl-center">⌖中心</span></button>
+      <button class="tb-btn" id="btn-settings">⚙<span id="lbl-settings">設定</span></button>
     </div>
   </div>
 
+  <!-- ===== MAIN AREA ===== -->
   <div id="main-area">
     <div id="canvas-wrap">
       <canvas id="gc"></canvas>
       <canvas id="ov"></canvas>
     </div>
 
-    <!-- Settings Panel -->
+    <!-- ===== SETTINGS PANEL ===== -->
     <div id="settings-backdrop"></div>
     <div id="settings-panel">
       <div class="settings-title">⚙ SETTINGS</div>
+
+      <!-- 夜間モード（最上部） -->
       <div class="settings-row">
-        <div><div class="settings-row-label">🔊 配置音</div></div>
+        <div>
+          <div class="settings-row-label" id="lbl-s-night">🌙 夜間モード</div>
+          <div class="settings-row-desc" id="desc-s-night">夜景・照明エフェクト</div>
+        </div>
+        <button id="settings-night" class="toggle-btn">OFF</button>
+      </div>
+
+      <div class="settings-divider"></div>
+
+      <!-- 配置音 -->
+      <div class="settings-row">
+        <div>
+          <div class="settings-row-label" id="lbl-s-sound">🔊 配置音</div>
+          <div class="settings-row-desc" id="desc-s-sound">ブロック配置時の効果音</div>
+        </div>
         <button id="settings-sound" class="toggle-btn on">ON</button>
       </div>
+
+      <!-- バイブ -->
       <div class="settings-row">
-        <div><div class="settings-row-label">📳 バイブ</div></div>
+        <div>
+          <div class="settings-row-label" id="lbl-s-vibe">📳 バイブ</div>
+          <div class="settings-row-desc" id="desc-s-vibe">タップ時の振動フィードバック</div>
+        </div>
         <button id="settings-vibe" class="toggle-btn on">ON</button>
       </div>
+
+      <!-- グリッド -->
       <div class="settings-row">
-        <div><div class="settings-row-label">⊞ グリッド</div></div>
+        <div>
+          <div class="settings-row-label" id="lbl-s-grid">⊞ グリッド</div>
+          <div class="settings-row-desc" id="desc-s-grid">グリッド線の表示</div>
+        </div>
         <button id="settings-grid" class="toggle-btn on">ON</button>
       </div>
-      <div class="settings-row">
-        <div><div class="settings-row-label">🌐 言語</div></div>
-        <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;">
+
+      <!-- 言語 -->
+      <div class="settings-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
+        <div>
+          <div class="settings-row-label" id="lbl-s-lang">🌐 言語</div>
+          <div class="settings-row-desc" id="desc-s-lang">表示言語を選択</div>
+        </div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;">
           <button class="lang-btn active" data-lang="ja">🇯🇵JA</button>
           <button class="lang-btn" data-lang="en">🇺🇸EN</button>
           <button class="lang-btn" data-lang="zh">🇨🇳ZH</button>
           <button class="lang-btn" data-lang="ko">🇰🇷KO</button>
+          <button class="lang-btn" data-lang="es">🇪🇸ES</button>
+          <button class="lang-btn" data-lang="fr">🇫🇷FR</button>
+          <button class="lang-btn" data-lang="id">🇮🇩ID</button>
+          <button class="lang-btn" data-lang="hi">🇮🇳HI</button>
         </div>
       </div>
+
       <div class="settings-divider"></div>
+
+      <!-- セーブ -->
       <div id="field-save-area" style="margin-bottom:8px;">
         <input id="field-name-input" type="text" placeholder="マップ名..." maxlength="30"
-          style="width:100%;padding:9px 10px;border-radius:8px;box-sizing:border-box;background:rgba(255,255,255,.06);border:1.5px solid var(--border);color:#fff;font-size:15px;font-family:'Noto Sans JP',sans-serif;outline:none;margin-bottom:6px;display:block;">
+          style="width:100%;padding:9px 10px;border-radius:8px;box-sizing:border-box;
+                 background:rgba(255,255,255,.06);border:1.5px solid var(--border);
+                 color:#fff;font-size:15px;font-family:'Noto Sans JP',sans-serif;
+                 outline:none;margin-bottom:6px;display:block;">
         <button id="settings-save" class="settings-action primary">💾 保存</button>
       </div>
       <div id="field-slot-list"></div>
+
       <button id="settings-clear" class="settings-action danger">🗑 マップをクリア</button>
       <button id="settings-close" class="settings-close">閉じる</button>
     </div>
 
-    <!-- Block Sheet -->
+    <!-- ===== BLOCK SHEET ===== -->
     <div id="sheet-backdrop"></div>
     <div id="sheet">
       <div id="sheet-handle"></div>
@@ -79,27 +122,45 @@
     </div>
   </div>
 
+  <!-- ===== BOTTOM BAR ===== -->
   <div id="bottom-bar">
     <button id="sel-preview">
       <div id="sel-icon" style="font-size:22px;line-height:1;">🏠</div>
       <div id="sel-label" style="font-size:7px;color:var(--gold);font-weight:700;margin-top:2px;">選択中</div>
     </button>
-    <button class="bb-btn active" id="tool-draw">✏<span class="bb-lbl">描く</span></button>
-    <button class="bb-btn" id="tool-erase">🗑<span class="bb-lbl">消す</span></button>
-    <button class="bb-btn" id="tool-fill">🪣<span class="bb-lbl">塗り</span></button>
-    <button id="parts-btn">🗂<span style="font-size:8px;font-weight:700;opacity:.75;">一覧</span></button>
+    <button class="bb-btn active" id="tool-draw">
+      <span style="font-size:17px;">✏️</span>
+      <span class="bb-lbl" id="lbl-draw">描く</span>
+    </button>
+    <button class="bb-btn" id="tool-erase">
+      <span style="font-size:17px;">🗑️</span>
+      <span class="bb-lbl" id="lbl-erase">消す</span>
+    </button>
+    <button class="bb-btn" id="tool-fill">
+      <span style="font-size:17px;">🪣</span>
+      <span class="bb-lbl" id="lbl-fill">塗り</span>
+    </button>
+    <button id="parts-btn">
+      <span style="font-size:17px;">🗂️</span>
+      <span style="font-size:8px;font-weight:700;opacity:.75;" id="lbl-list">一覧</span>
+    </button>
   </div>
-</div>
 
-<!-- Context Menu (direction / delete) -->
+</div><!-- /#app -->
+
+<!-- ===== CONTEXT MENU ===== -->
 <div id="ctx-menu">
   <div class="ctx-title" id="ctx-title">向き</div>
   <div class="ctx-dir-grid">
-    <div></div><button class="ctx-dir-btn" data-dir="N">↑</button><div></div>
+    <div></div>
+    <button class="ctx-dir-btn" data-dir="N">↑</button>
+    <div></div>
     <button class="ctx-dir-btn" data-dir="W">←</button>
     <button class="ctx-dir-btn center-btn" data-dir="none" id="ctx-auto">自動</button>
     <button class="ctx-dir-btn" data-dir="E">→</button>
-    <div></div><button class="ctx-dir-btn" data-dir="S">↓</button><div></div>
+    <div></div>
+    <button class="ctx-dir-btn" data-dir="S">↓</button>
+    <div></div>
   </div>
   <div class="ctx-sep"></div>
   <button class="ctx-action danger" id="ctx-delete">🗑 削除</button>
