@@ -12,6 +12,23 @@ var hoverC = -1, hoverR = -1;
 var dirty = true;
 var gc, ov, gctx, octx, cw, ch;
 
+// ── Background theme ─────────────────────────────────────────────
+var bgTheme = 'default';
+
+// テーマごとのカラーパレット: [空グラデ上, 空グラデ下, 地面(昼), 地面(夜)]
+var BG_THEMES = {
+  'default': ['#0a1f3a', '#051020', '#1a3a20', '#0c1f12'],
+  'grass'  : ['#0d3318', '#061a0a', '#2e5a30', '#0e2410'],
+  'desert' : ['#3a2408', '#1e1004', '#8c6030', '#4a3010'],
+  'snow'   : ['#1a2a40', '#0a1628', '#7aaccc', '#3a607a'],
+  'ocean'  : ['#040e22', '#020810', '#0a3060', '#050f28'],
+  'stone'  : ['#111118', '#080810', '#48485a', '#242430']
+};
+
+function getBgPalette(){
+  return BG_THEMES[bgTheme] || BG_THEMES['default'];
+}
+
 // ── Cell helpers ─────────────────────────────────────────────────
 function ck(c,r){ return c+','+r; }
 function inGrid(c,r){ return c>=0 && c<COLS && r>=0 && r<ROWS; }
@@ -215,6 +232,8 @@ function render(){
   if(!gctx) return;
   gctx.clearRect(0,0,cw,ch);
 
+  var pal = getBgPalette(); // [空top, 空bot, 地面昼, 地面夜]
+
   // Sky background
   if(nightMode){
     var sky=gctx.createLinearGradient(0,0,0,ch);
@@ -222,7 +241,7 @@ function render(){
     gctx.fillStyle=sky; gctx.fillRect(0,0,cw,ch);
   } else {
     var sky2=gctx.createLinearGradient(0,0,0,ch);
-    sky2.addColorStop(0,'#0a1f3a'); sky2.addColorStop(1,'#051020');
+    sky2.addColorStop(0, pal[0]); sky2.addColorStop(1, pal[1]);
     gctx.fillStyle=sky2; gctx.fillRect(0,0,cw,ch);
   }
 
@@ -236,11 +255,10 @@ function render(){
   tileList.sort(function(a,b){ return (a[0]+a[1])-(b[0]+b[1]); });
 
   // ── Pass 1: 全タイルの地面を先に描く ────────────────────────────
-  // これにより隣タイルの地面がビルの壁を上書きしなくなる
   tileList.forEach(function(cr){
     var c=cr[0], r=cr[1];
     var s=cellToScreen(c,r);
-    var gfill  = nightMode ? '#0c1f12' : '#1a3a20';
+    var gfill  = nightMode ? pal[3] : pal[2];
     var gstroke= showGrid  ? (nightMode?'rgba(255,255,255,0.05)':'rgba(255,255,255,0.08)') : null;
     drawDiamond(gctx, s.x, s.y, gfill, gstroke, 0.5);
   });
