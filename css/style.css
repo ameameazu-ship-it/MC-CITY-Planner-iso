@@ -66,15 +66,15 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
   cursor:default;
 }
 #sel-icon{
-  font-size:24px;
+  font-size:18px;
   line-height:1;
   display:block;
 }
 #sel-label{
-  font-size:8px;
+  font-size:7px;
   color:var(--gold);
   font-weight:700;
-  margin-top:4px;
+  margin-top:2px;
   text-align:center;
   line-height:1.2;
   white-space:nowrap;
@@ -112,7 +112,7 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
   color:#fff;
 }
 .bb-lbl{
-  font-size:8px;
+  font-size:7px;
   font-weight:700;
   opacity:.85;
   font-family:'Noto Sans JP',sans-serif;
@@ -136,9 +136,10 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
   cursor:pointer;
   z-index:35;
   touch-action:manipulation;
-  gap:3px;
+  gap:1px;
   flex-shrink:0;
   box-shadow:none;
+  padding-bottom:6px;
   transition:transform .18s cubic-bezier(.34,1.56,.64,1), border-color .15s, background .15s;
   -webkit-tap-highlight-color:transparent;
 }
@@ -163,7 +164,7 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
   background:linear-gradient(180deg,#0f2a42,#071828);
 }
 #parts-btn #lbl-list{
-  font-size:11px;
+  font-size:9px;
   font-weight:900;
   font-family:'Noto Sans JP',sans-serif;
   color:var(--gold);
