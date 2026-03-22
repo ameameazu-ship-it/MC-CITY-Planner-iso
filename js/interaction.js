@@ -88,22 +88,13 @@ function floodFill(c,r){
 
 // ── Sound ─────────────────────────────────────────────────────────
 var _audioCtx = null;
-var _audioReady = false;
-
-// document全体の最初のpointerdownでAudioContextをunlock（最も確実な方法）
-function _unlockAudio(){
-  if(_audioReady) return;
-  try{
-    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    _audioCtx.resume().then(function(){ _audioReady = true; }).catch(function(){});
-  }catch(e){}
-}
-document.addEventListener('pointerdown', _unlockAudio, {once:true});
-document.addEventListener('touchend',    _unlockAudio, {once:true});
 
 function playPlaceSound(){
-  if(!_audioReady || !_audioCtx) return;
+  if(!soundOn) return;
   try {
+    if(!_audioCtx){
+      _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
     var osc = _audioCtx.createOscillator(), g = _audioCtx.createGain();
     osc.connect(g); g.connect(_audioCtx.destination);
     osc.frequency.value = 440 + Math.random() * 160;
