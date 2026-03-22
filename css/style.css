@@ -9,9 +9,9 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
   --surface:#071828;
   --border:#1a4060;
   --text:#d4eaf7;
-  --dim:#5a8aaa;a
+  --dim:#5a8aaa;
 }
-a
+
 /* ===== APP SHELL ===== */
 #app{display:flex;flex-direction:column;height:100dvh;background:var(--bg);overflow:hidden;padding-top:env(safe-area-inset-top);}
 
@@ -45,7 +45,9 @@ a
   min-height:54px;
   touch-action:manipulation;
   position:relative;
-  overflow:visible;
+  /* overflow:visibleはflexアイテムでautoに変換されるため使わない */
+  /* parts-btnの円はclip-pathで上方向だけ許可 */
+  clip-path:inset(-60px 0 0 0);
 }
 
 /* ── 選択中ブロック表示（クリック不可・フラット） */
