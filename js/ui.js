@@ -245,6 +245,7 @@ function openSheet(){
     pb.classList.remove('popping');
     void pb.offsetWidth;
     pb.classList.add('popping');
+    pb.classList.add('sheet-open');
   }
   document.getElementById('sheet').classList.add('open');
   document.getElementById('sheet-backdrop').style.display = 'block';
@@ -265,13 +266,11 @@ function initPartsPopOnTouch(){
 function closeSheet(){
   sheetOpen = false;
   var pb = document.getElementById('parts-btn');
-  // シートのtransition(0.3s)が終わるまで円を隠す
-  if(pb) pb.style.opacity = '0';
   document.getElementById('sheet').classList.remove('open');
   document.getElementById('sheet-backdrop').style.display = 'none';
   if(pb) pb.classList.remove('open-state');
   setTimeout(function(){
-    if(pb) pb.style.opacity = '';
+    if(pb) pb.classList.remove('sheet-open');
   }, 320);
 }
 
