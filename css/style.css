@@ -146,24 +146,12 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
   border-color:#ffe066;
 }
 @keyframes parts-pop{
-  0%  { transform:translateY(calc(-50% - env(safe-area-inset-bottom,0px)/2)) scale(.78); border-color:#ffe066; }
-  45% { transform:translateY(calc(-50% - env(safe-area-inset-bottom,0px)/2)) scale(1.14); border-color:#fff8aa; }
-  65% { transform:translateY(calc(-50% - env(safe-area-inset-bottom,0px)/2)) scale(.96); border-color:#f5c842; }
-  82% { transform:translateY(calc(-50% - env(safe-area-inset-bottom,0px)/2)) scale(1.04); }
-  100%{ transform:translateY(calc(-50% - env(safe-area-inset-bottom,0px)/2)) scale(1);   border-color:#f5c842; }
-}
-@keyframes grid-spin{
-  0%  { transform:rotate(0deg)   scale(1); }
-  30% { transform:rotate(22deg)  scale(1.18); }
-  60% { transform:rotate(-10deg) scale(.95); }
-  80% { transform:rotate(5deg)   scale(1.04); }
-  100%{ transform:rotate(0deg)   scale(1); }
+  0%  { transform:translateY(calc(-50% - env(safe-area-inset-bottom,0px)/2)) scale(.92); }
+  55% { transform:translateY(calc(-50% - env(safe-area-inset-bottom,0px)/2)) scale(1.05); }
+  100%{ transform:translateY(calc(-50% - env(safe-area-inset-bottom,0px)/2)) scale(1); }
 }
 #parts-btn.popping{
-  animation:parts-pop .42s cubic-bezier(.34,1.56,.64,1) forwards;
-}
-#parts-btn.popping svg{
-  animation:grid-spin .42s cubic-bezier(.34,1.56,.64,1) forwards;
+  animation:parts-pop .25s cubic-bezier(.34,1.56,.64,1) forwards;
 }
 #parts-btn.open-state{
   border-color:var(--gold);
