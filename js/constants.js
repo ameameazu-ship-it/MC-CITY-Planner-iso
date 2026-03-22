@@ -7,7 +7,7 @@
 
 // ── Grid / ISO geometry ──────────────────────────────────────────
 var COLS = 40, ROWS = 40;
-var ISO_W = 64, ISO_H = 32;
+var ISO_W = 48, ISO_H = 24;
 var HW = ISO_W / 2, HH = ISO_H / 2;
 var MIN_ZOOM = 0.3, MAX_ZOOM = 3.5;
 var DEFAULT_ZOOM = 0.85;
