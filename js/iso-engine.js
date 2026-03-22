@@ -74,19 +74,19 @@ function clipDiamond(ctx, x, y){
 // ── Draw: isometric box ──────────────────────────────────────────
 function isoBox(ctx, x, y, bh, tc, lc, rc){
   var hw=HW*zoom, hh=HH*zoom, zb=bh*zoom;
-  // Left face (NW wall)
+  // Left face (NW wall) - 下端をy+hh*2まで
   ctx.beginPath();
   ctx.moveTo(x,    y-zb);
   ctx.lineTo(x-hw, y+hh-zb);
-  ctx.lineTo(x-hw, y+hh);
-  ctx.lineTo(x,    y);
+  ctx.lineTo(x-hw, y+hh*2);
+  ctx.lineTo(x,    y+hh*2);
   ctx.closePath(); ctx.fillStyle=lc; ctx.fill();
-  // Right face (NE wall)
+  // Right face (NE wall) - 下端をy+hh*2まで
   ctx.beginPath();
   ctx.moveTo(x,    y-zb);
   ctx.lineTo(x+hw, y+hh-zb);
-  ctx.lineTo(x+hw, y+hh);
-  ctx.lineTo(x,    y);
+  ctx.lineTo(x+hw, y+hh*2);
+  ctx.lineTo(x,    y+hh*2);
   ctx.closePath(); ctx.fillStyle=rc; ctx.fill();
   // Top face
   ctx.beginPath();
