@@ -88,20 +88,39 @@ function floodFill(c,r){
 
 // ── Sound ─────────────────────────────────────────────────────────
 var _audioCtx = null;
+var _pendingSound = false;
+
+function _tryInitAudio(){
+  if(_audioCtx) return;
+  try{ _audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
+}
+
+function _doPlaySound(){
+  if(!_audioCtx) return;
+  try{
+    var osc=_audioCtx.createOscillator(), g=_audioCtx.createGain();
+    osc.connect(g); g.connect(_audioCtx.destination);
+    osc.frequency.value=440+Math.random()*160;
+    g.gain.setValueAtTime(0.08,_audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,_audioCtx.currentTime+0.12);
+    osc.start(); osc.stop(_audioCtx.currentTime+0.12);
+  }catch(e){}
+}
+
+// touchend/mouseupで実際に音を鳴らす（touchstartではAudioContext生成不可）
+document.addEventListener('touchend', function(){
+  _tryInitAudio();
+  if(_pendingSound && soundOn){ _doPlaySound(); }
+  _pendingSound = false;
+}, {passive:true});
+document.addEventListener('mouseup', function(){
+  _tryInitAudio();
+  if(_pendingSound && soundOn){ _doPlaySound(); }
+  _pendingSound = false;
+}, {passive:true});
 
 function playPlaceSound(){
-  if(!soundOn) return;
-  try {
-    if(!_audioCtx){
-      _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    var osc = _audioCtx.createOscillator(), g = _audioCtx.createGain();
-    osc.connect(g); g.connect(_audioCtx.destination);
-    osc.frequency.value = 440 + Math.random() * 160;
-    g.gain.setValueAtTime(0.08, _audioCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.12);
-    osc.start(); osc.stop(_audioCtx.currentTime + 0.12);
-  } catch(e){}
+  _pendingSound = true; // touchend/mouseupで発火
 }
 
 // ── Vibrate ───────────────────────────────────────────────────────
