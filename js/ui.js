@@ -22,7 +22,7 @@ var I18N = {
     s_sound:'🔊 配置音',     s_sound_desc:'ブロック配置時の効果音',
     s_vibe:'📳 バイブ',      s_vibe_desc:'タップ時の振動フィードバック',
     s_grid:'⊞ グリッド',    s_grid_desc:'グリッド線の表示',
-    s_bg:'🎨 背景色',        s_bg_desc:'マップの地面・空の色',
+    s_bg:'🎨 背景色',        s_bg_desc:'マップの背景色（地面・空に連動）',
     s_lang:'🌐 言語',        s_lang_desc:'表示言語を選択'
   },
   en:{
@@ -38,7 +38,7 @@ var I18N = {
     s_sound:'🔊 Sound',       s_sound_desc:'Sound effect on block placement',
     s_vibe:'📳 Vibrate',      s_vibe_desc:'Haptic feedback on tap',
     s_grid:'⊞ Grid',         s_grid_desc:'Show grid lines',
-    s_bg:'🎨 Background',     s_bg_desc:'Ground & sky color of the map',
+    s_bg:'🎨 Background',     s_bg_desc:'Changes ground & sky to match',
     s_lang:'🌐 Language',     s_lang_desc:'Select display language'
   },
   zh:{
@@ -54,7 +54,7 @@ var I18N = {
     s_sound:'🔊 音效',       s_sound_desc:'放置方块时的音效',
     s_vibe:'📳 振动',        s_vibe_desc:'点按时的触觉反馈',
     s_grid:'⊞ 网格',        s_grid_desc:'显示网格线',
-    s_bg:'🎨 背景色',        s_bg_desc:'地图的地面和天空颜色',
+    s_bg:'🎨 背景色',        s_bg_desc:'地面和天空颜色一起联动变化',
     s_lang:'🌐 语言',        s_lang_desc:'选择显示语言'
   },
   ko:{
@@ -70,7 +70,7 @@ var I18N = {
     s_sound:'🔊 효과음',     s_sound_desc:'블록 배치 시 효과음',
     s_vibe:'📳 진동',        s_vibe_desc:'탭 시 진동 피드백',
     s_grid:'⊞ 그리드',      s_grid_desc:'그리드 선 표시',
-    s_bg:'🎨 배경색',        s_bg_desc:'맵의 지면·하늘 색상',
+    s_bg:'🎨 배경색',        s_bg_desc:'지면·하늘이 함께 바뀝니다',
     s_lang:'🌐 언어',        s_lang_desc:'표시 언어 선택'
   },
   es:{
@@ -86,7 +86,7 @@ var I18N = {
     s_sound:'🔊 Sonido',      s_sound_desc:'Efecto al colocar bloques',
     s_vibe:'📳 Vibración',    s_vibe_desc:'Vibración táctil al tocar',
     s_grid:'⊞ Cuadrícula',   s_grid_desc:'Mostrar líneas de cuadrícula',
-    s_bg:'🎨 Fondo',          s_bg_desc:'Color del suelo y el cielo',
+    s_bg:'🎨 Fondo',          s_bg_desc:'Cambia suelo y cielo a la vez',
     s_lang:'🌐 Idioma',       s_lang_desc:'Seleccionar idioma'
   },
   fr:{
@@ -102,7 +102,7 @@ var I18N = {
     s_sound:'🔊 Son',          s_sound_desc:'Effet sonore lors du placement',
     s_vibe:'📳 Vibration',     s_vibe_desc:'Retour haptique au toucher',
     s_grid:'⊞ Grille',        s_grid_desc:'Afficher les lignes de grille',
-    s_bg:'🎨 Fond',            s_bg_desc:'Couleur du sol et du ciel',
+    s_bg:'🎨 Fond',            s_bg_desc:'Sol et ciel changent ensemble',
     s_lang:'🌐 Langue',        s_lang_desc:'Sélectionner la langue'
   },
   id:{
@@ -118,7 +118,7 @@ var I18N = {
     s_sound:'🔊 Suara',        s_sound_desc:'Efek suara saat meletakkan blok',
     s_vibe:'📳 Getar',         s_vibe_desc:'Umpan balik getar saat mengetuk',
     s_grid:'⊞ Kisi',          s_grid_desc:'Tampilkan garis kisi',
-    s_bg:'🎨 Latar belakang',  s_bg_desc:'Warna tanah dan langit peta',
+    s_bg:'🎨 Latar belakang',  s_bg_desc:'Tanah dan langit berubah bersama',
     s_lang:'🌐 Bahasa',        s_lang_desc:'Pilih bahasa tampilan'
   },
   hi:{
@@ -134,7 +134,7 @@ var I18N = {
     s_sound:'🔊 ध्वनि',        s_sound_desc:'ब्लॉक रखने पर ध्वनि प्रभाव',
     s_vibe:'📳 कंपन',          s_vibe_desc:'टैप पर कंपन प्रतिक्रिया',
     s_grid:'⊞ ग्रिड',         s_grid_desc:'ग्रिड रेखाएं दिखाएं',
-    s_bg:'🎨 पृष्ठभूमि',      s_bg_desc:'मानचित्र की भूमि और आकाश का रंग',
+    s_bg:'🎨 पृष्ठभूमि',      s_bg_desc:'भूमि और आकाश एक साथ बदलते हैं',
     s_lang:'🌐 भाषा',          s_lang_desc:'प्रदर्शन भाषा चुनें'
   }
 };
