@@ -32,16 +32,124 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
 #ov{display:block;pointer-events:none;position:absolute;top:0;left:0;}
 
 /* ===== BOTTOM BAR ===== */
-#bottom-bar{display:flex;align-items:center;gap:5px;padding:6px 8px;padding-bottom:calc(6px + env(safe-area-inset-bottom));background:linear-gradient(0deg,#0d2035,#071828);border-top:2px solid var(--gold);flex-shrink:0;min-height:60px;touch-action:manipulation;}
-.bb-btn{min-width:46px;min-height:46px;border:1.5px solid var(--border);border-radius:10px;background:linear-gradient(180deg,#0f2a42,#071828);color:var(--text);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;flex:1;transition:all .15s;box-shadow:0 2px 6px rgba(0,0,0,.4);touch-action:manipulation;}
+#bottom-bar{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 8px;
+  padding-right:96px; /* 一覧円のスペース確保 */
+  padding-bottom:calc(6px + env(safe-area-inset-bottom));
+  background:linear-gradient(0deg,#0d2035,#071828);
+  border-top:2px solid var(--gold);
+  flex-shrink:0;
+  min-height:64px;
+  touch-action:manipulation;
+  position:relative;
+  overflow:visible; /* 円がバーからはみ出せるように */
+}
+
+/* ── 選択中ブロック表示（クリック不可・フラット） */
+#sel-preview{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
+  min-width:54px;
+  padding:4px 4px;
+  pointer-events:none;  /* クリック不可 */
+  user-select:none;
+  cursor:default;
+}
+#sel-icon{
+  font-size:24px;
+  line-height:1;
+  display:block;
+}
+#sel-label{
+  font-size:8px;
+  color:var(--gold);
+  font-weight:700;
+  margin-top:4px;
+  text-align:center;
+  line-height:1.2;
+  white-space:nowrap;
+  overflow:hidden;
+  max-width:54px;
+  text-overflow:ellipsis;
+}
+
+/* ── 中央3ボタン（従来デザイン） */
+.bb-btn{
+  min-width:0;
+  min-height:48px;
+  border:1.5px solid var(--border);
+  border-radius:10px;
+  background:linear-gradient(180deg,#0f2a42,#071828);
+  color:var(--text);
+  cursor:pointer;
+  font-size:15px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  gap:3px;
+  flex:1;
+  transition:all .15s;
+  box-shadow:0 2px 6px rgba(0,0,0,.4);
+  touch-action:manipulation;
+  padding:4px 2px;
+}
 .bb-btn:active{transform:scale(.93);}
-.bb-btn.active{background:linear-gradient(180deg,#1a5a9a,#0a3060);border-color:var(--blue);color:#fff;}
-.bb-lbl{font-size:8px;font-weight:700;opacity:.75;}
-#sel-preview{min-width:52px;min-height:46px;border:2px solid var(--gold);border-radius:10px;background:linear-gradient(180deg,#1a3a18,#0a1a08);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;padding:3px;touch-action:manipulation;}
-#sel-preview:active{transform:scale(.93);}
-#parts-btn{min-width:46px;min-height:46px;border:1.5px solid var(--border);border-radius:10px;background:linear-gradient(180deg,#0f2a42,#071828);color:var(--dim);cursor:pointer;font-size:17px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;flex-shrink:0;touch-action:manipulation;}
-#parts-btn.open-state{border-color:var(--gold);color:var(--gold);}
-#parts-btn:active{transform:scale(.93);}
+.bb-btn.active{
+  background:linear-gradient(180deg,#1a5a9a,#0a3060);
+  border-color:var(--blue);
+  color:#fff;
+}
+.bb-lbl{
+  font-size:8px;
+  font-weight:700;
+  opacity:.85;
+  font-family:'Noto Sans JP',sans-serif;
+}
+
+/* ── 一覧ボタン（円・右端から飛び出す） */
+#parts-btn{
+  position:absolute;
+  right:-18px;
+  top:50%;
+  transform:translateY(calc(-50% - env(safe-area-inset-bottom, 0px) / 2));
+  width:112px;
+  height:112px;
+  border-radius:50%;
+  background:linear-gradient(180deg,#3a4a6a,#1a2a40);
+  border:2.5px solid var(--gold);
+  color:var(--gold);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  z-index:10;
+  touch-action:manipulation;
+  gap:4px;
+  flex-shrink:0;
+  box-shadow:-4px 0 20px rgba(0,0,0,.6);
+  transition:all .15s;
+}
+#parts-btn:active{
+  transform:translateY(calc(-50% - env(safe-area-inset-bottom, 0px) / 2)) scale(.93);
+}
+#parts-btn.open-state{
+  border-color:var(--gold);
+  background:linear-gradient(180deg,#4a5a7a,#2a3a50);
+}
+#parts-btn #lbl-list{
+  font-size:11px;
+  font-weight:900;
+  font-family:'Noto Sans JP',sans-serif;
+  color:var(--gold);
+}
 
 /* ===== BLOCK SHEET ===== */
 #sheet-backdrop{display:none;position:absolute;inset:0;background:rgba(0,0,0,.55);z-index:20;}
