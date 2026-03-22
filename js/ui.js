@@ -170,8 +170,12 @@ function applyLang(newLang){
   setText('ctx-auto',   t('auto'));
   setText('ctx-delete', t('delete'));
 
-  // ── sel-label ──
-  var selLabel = document.getElementById('sel-label'); if(selLabel) selLabel.textContent = t('selected');
+  // ── sel-label（現在選択中ブロック名を新言語で表示）──
+  var selLabel = document.getElementById('sel-label');
+  if(selLabel){
+    var selBlock = BLOCKS[selectedId];
+    selLabel.textContent = selBlock ? (selBlock.name[lang] || selBlock.name.ja) : t('selected');
+  }
 
   rebuildSheet();
 }
