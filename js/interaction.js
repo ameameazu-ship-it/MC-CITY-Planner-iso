@@ -87,25 +87,26 @@ function floodFill(c,r){
 }
 
 // ── Sound ─────────────────────────────────────────────────────────
-// AudioContextはユーザー操作後に1つだけ生成・使い回す（Autoplay Policy対策）
 var _audioCtx = null;
-function _getAudioCtx(){
-  if(!_audioCtx){
-    try{ _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){ return null; }
-  }
-  if(_audioCtx.state === 'suspended') _audioCtx.resume();
-  return _audioCtx;
+
+// 最初のユーザー操作時にAudioContextを初期化（Autoplay Policy対策）
+function _initAudioCtx(){
+  if(_audioCtx) return;
+  try{
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }catch(e){}
 }
 
 function playPlaceSound(){
   try {
-    var ac = _getAudioCtx(); if(!ac) return;
-    var osc = ac.createOscillator(), g = ac.createGain();
-    osc.connect(g); g.connect(ac.destination);
+    if(!_audioCtx) return;
+    if(_audioCtx.state === 'suspended') _audioCtx.resume();
+    var osc = _audioCtx.createOscillator(), g = _audioCtx.createGain();
+    osc.connect(g); g.connect(_audioCtx.destination);
     osc.frequency.value = 440 + Math.random() * 160;
-    g.gain.setValueAtTime(0.08, ac.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.12);
-    osc.start(); osc.stop(ac.currentTime + 0.12);
+    g.gain.setValueAtTime(0.08, _audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.12);
+    osc.start(); osc.stop(_audioCtx.currentTime + 0.12);
   } catch(e){}
 }
 
@@ -175,6 +176,7 @@ function initInteraction(){
 // ── Touch handlers ────────────────────────────────────────────────
 function onTouchStart(e){
   e.preventDefault();
+  _initAudioCtx(); // 最初のタッチでAudioContextを初期化
   var touches=e.touches;
 
   if(touches.length===2){
@@ -253,6 +255,7 @@ function onTouchEnd(e){
 // ── Mouse handlers ────────────────────────────────────────────────
 function onMouseDown(e){
   if(e.button!==0) return;
+  _initAudioCtx(); // 最初のクリックでAudioContextを初期化
   var cell=screenToCell(e.offsetX,e.offsetY);
   if(tool==='fill'){ pushUndo(); floodFill(cell.c,cell.r); return; }
   isPointerDown=true;
