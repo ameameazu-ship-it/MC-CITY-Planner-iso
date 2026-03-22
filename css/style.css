@@ -127,7 +127,7 @@ html,body{height:100%;overflow:hidden;background:#020b18;font-family:'Noto Sans 
 #parts-btn{
   position:fixed;
   right:-16px;
-  bottom:calc(env(safe-area-inset-bottom) + 4px);
+  bottom:calc(env(safe-area-inset-bottom) - 20px);
   width:96px;
   height:96px;
   border-radius:50%;
