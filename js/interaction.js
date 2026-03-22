@@ -87,15 +87,25 @@ function floodFill(c,r){
 }
 
 // ── Sound ─────────────────────────────────────────────────────────
+// AudioContextはユーザー操作後に1つだけ生成・使い回す（Autoplay Policy対策）
+var _audioCtx = null;
+function _getAudioCtx(){
+  if(!_audioCtx){
+    try{ _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){ return null; }
+  }
+  if(_audioCtx.state === 'suspended') _audioCtx.resume();
+  return _audioCtx;
+}
+
 function playPlaceSound(){
   try {
-    var ac=new AudioContext();
-    var osc=ac.createOscillator(), g=ac.createGain();
+    var ac = _getAudioCtx(); if(!ac) return;
+    var osc = ac.createOscillator(), g = ac.createGain();
     osc.connect(g); g.connect(ac.destination);
-    osc.frequency.value=440+Math.random()*160;
-    g.gain.setValueAtTime(0.08,ac.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.12);
-    osc.start(); osc.stop(ac.currentTime+0.12);
+    osc.frequency.value = 440 + Math.random() * 160;
+    g.gain.setValueAtTime(0.08, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.12);
+    osc.start(); osc.stop(ac.currentTime + 0.12);
   } catch(e){}
 }
 
