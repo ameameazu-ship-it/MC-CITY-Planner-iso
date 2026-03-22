@@ -95,7 +95,7 @@ function _unlockAudio(){
   if(_audioReady) return;
   try{
     _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    _audioCtx.resume().then(function(){ _audioReady = true; });
+    _audioCtx.resume().then(function(){ _audioReady = true; }).catch(function(){});
   }catch(e){}
 }
 document.addEventListener('pointerdown', _unlockAudio, {once:true});
