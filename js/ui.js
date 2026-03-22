@@ -240,9 +240,26 @@ function selectBlock(id){
 
 function openSheet(){
   sheetOpen = true;
+  var pb = document.getElementById('parts-btn');
+  if(pb){
+    pb.classList.remove('popping');
+    void pb.offsetWidth;
+    pb.classList.add('popping');
+  }
   document.getElementById('sheet').classList.add('open');
   document.getElementById('sheet-backdrop').style.display = 'block';
-  document.getElementById('parts-btn').classList.add('open-state');
+  if(pb) pb.classList.add('open-state');
+}
+
+// iOSはtouchstartでアニメーションを直接発火
+function initPartsPopOnTouch(){
+  var pb = document.getElementById('parts-btn');
+  if(!pb) return;
+  pb.addEventListener('touchstart', function(){
+    pb.classList.remove('popping');
+    void pb.offsetWidth;
+    pb.classList.add('popping');
+  }, {passive:true});
 }
 
 function closeSheet(){
@@ -375,4 +392,7 @@ function initUI(){
   });
   on('ctx-delete', 'click', ctxDelete);
   on('ctx-close',  'click', closeCtxMenu);
+
+  // iOS touch対応
+  initPartsPopOnTouch();
 }
