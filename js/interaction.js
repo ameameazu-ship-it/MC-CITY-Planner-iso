@@ -188,12 +188,13 @@ function initInteraction(){
   wrap.addEventListener('touchcancel',onTouchEnd,   {passive:false});
 
   gc.addEventListener('mousedown',  onMouseDown);
-  gc.addEventListener('mousemove',  onMouseMove);
-  gc.addEventListener('mouseup',    onMouseUp);
-  gc.addEventListener('mouseleave', onMouseLeave);
+  gc.addEventListener('mousemove',  onMouseMove);   // hover用
+  gc.addEventListener('mouseleave', onMouseLeave);  // hover解除用
   gc.addEventListener('wheel',      onWheel, {passive:false});
-  // 中クリック（ホイールボタン）でのスクロール防止
-  gc.addEventListener('auxclick', function(e){ e.preventDefault(); });
+  gc.addEventListener('auxclick',   function(e){ e.preventDefault(); });
+  // パン中は document レベルで追跡（canvas外に出ても止まらない）
+  document.addEventListener('mousemove', onDocMouseMove);
+  document.addEventListener('mouseup',   onDocMouseUp);
 
   document.getElementById('btn-undo').addEventListener('click', undo);
   document.getElementById('btn-redo').addEventListener('click', redo);
@@ -376,15 +377,7 @@ function onMouseDown(e){
 }
 
 function onMouseMove(e){
-  // パン中
-  if(isPanning){
-    // 感度を少し抑える（0.88倍）
-    panX = panStartPX + (e.clientX - panStartX) * 0.88;
-    panY = panStartPY + (e.clientY - panStartY) * 0.88;
-    scheduleRender();
-    return;
-  }
-
+  // gc上のhover & 描画（パンはonDocMouseMoveが担当）
   var cell=screenToCell(e.offsetX,e.offsetY);
   hoverC=cell.c; hoverR=cell.r;
   if(isPointerDown) handleDraw(cell.c,cell.r);
@@ -392,21 +385,33 @@ function onMouseMove(e){
 }
 
 function onMouseUp(e){
-  if(isPanning){
-    isPanning=false;
-    gc.style.cursor = isPanMode ? 'grab' : 'crosshair';
-    return;
-  }
+  // gc上でのマウスアップ：描画終了のみ担当
   if(isPointerDown){ commitStamp(); }
   isPointerDown=false;
 }
 
 function onMouseLeave(e){
-  if(isPanning){ isPanning=false; gc.style.cursor = isPanMode ? 'grab' : 'crosshair'; }
-  if(isPointerDown){ commitStamp(); }
-  isPointerDown=false;
+  // パン中はdocumentが拾うのでここでは止めない
+  if(!isPanning){
+    if(isPointerDown){ commitStamp(); }
+    isPointerDown=false;
+  }
   hoverC=-1; hoverR=-1;
   scheduleRender();
+}
+
+// ── Document-level pan handlers（canvas外でも動作）────────────────
+function onDocMouseMove(e){
+  if(!isPanning) return;
+  panX = panStartPX + (e.clientX - panStartX) * 0.88;
+  panY = panStartPY + (e.clientY - panStartY) * 0.88;
+  scheduleRender();
+}
+
+function onDocMouseUp(e){
+  if(!isPanning) return;
+  isPanning = false;
+  if(gc) gc.style.cursor = isPanMode ? 'grab' : 'crosshair';
 }
 
 function onWheel(e){
