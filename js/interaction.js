@@ -16,12 +16,12 @@ var pinchZoom0  = 1;
 var pinchPanX0  = 0, pinchPanY0  = 0;
 var pinchMid0X  = 0, pinchMid0Y  = 0;
 
-// ── Touch draw threshold（意図しない設置防止）────────────────────
+// ── Touch draw threshold ──────────────────────────────────────────
 var touchDrawStarted = false;
 var touchStartX      = 0, touchStartY = 0;
 var DRAW_THRESHOLD   = 10;
 
-// ── Pan mode（PCドラッグ移動）────────────────────────────────────
+// ── Pan mode ──────────────────────────────────────────────────────
 var isPanMode  = false;
 var isPanning  = false;
 var panStartX  = 0, panStartY  = 0;
@@ -111,7 +111,6 @@ function _tryInitAudio(){
   if(_audioCtx) return;
   try{ _audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
 }
-
 function _doPlaySound(){
   if(!_audioCtx) return;
   try{
@@ -123,32 +122,27 @@ function _doPlaySound(){
     osc.start(); osc.stop(_audioCtx.currentTime+0.12);
   }catch(e){}
 }
-
 document.addEventListener('touchend', function(){
   _tryInitAudio();
-  if(_pendingSound && soundOn){ _doPlaySound(); }
+  if(_pendingSound && soundOn) _doPlaySound();
   _pendingSound = false;
 }, {passive:true});
 document.addEventListener('mouseup', function(){
   _tryInitAudio();
-  if(_pendingSound && soundOn){ _doPlaySound(); }
+  if(_pendingSound && soundOn) _doPlaySound();
   _pendingSound = false;
 }, {passive:true});
-
 function playPlaceSound(){ _pendingSound = true; }
 
 // ── Vibrate ───────────────────────────────────────────────────────
 function vibrateShort(){ if(vibeOn && navigator.vibrate) navigator.vibrate(18); }
 function vibrateLong(){  if(vibeOn && navigator.vibrate) navigator.vibrate(30); }
 
-// ── Pointer event helpers ─────────────────────────────────────────
-function clientToCell(clientX, clientY){
+// ── Coordinate helpers ────────────────────────────────────────────
+function clientToCell(cx, cy){
   var rect = gc.getBoundingClientRect();
-  return screenToCell(clientX - rect.left, clientY - rect.top);
+  return screenToCell(cx - rect.left, cy - rect.top);
 }
-
-function ptToCell(e){ return clientToCell(e.clientX, e.clientY); }
-
 function ptDist(t1,t2){
   var dx=t1.clientX-t2.clientX, dy=t1.clientY-t2.clientY;
   return Math.sqrt(dx*dx+dy*dy);
@@ -166,31 +160,12 @@ function setTool(t2){
   });
 }
 
-// ── Pan helpers（document へ動的登録）────────────────────────────
-function _onPanMove(e){
-  panX = panStartPX + (e.clientX - panStartX) * 0.88;
-  panY = panStartPY + (e.clientY - panStartY) * 0.88;
-  scheduleRender();
-}
-function _onPanUp(e){
-  stopPan();
-}
-function startPan(e){
-  isPanning  = true;
-  panStartX  = e.clientX;
-  panStartY  = e.clientY;
-  panStartPX = panX;
-  panStartPY = panY;
-  updateCursor();
-  document.addEventListener('mousemove', _onPanMove);
-  document.addEventListener('mouseup',   _onPanUp);
-}
-function stopPan(){
-  if(!isPanning) return;
-  isPanning = false;
-  updateCursor();
-  document.removeEventListener('mousemove', _onPanMove);
-  document.removeEventListener('mouseup',   _onPanUp);
+// ── Cursor helper ─────────────────────────────────────────────────
+function updateCursor(){
+  if(!gc) return;
+  if(isPanning)      gc.style.cursor = 'grabbing';
+  else if(isPanMode) gc.style.cursor = 'grab';
+  else               gc.style.cursor = 'crosshair';
 }
 
 // ── Pan mode toggle（btn-center 転用）────────────────────────────
@@ -201,31 +176,25 @@ function togglePanMode(){
   updateCursor();
 }
 
-function updateCursor(){
-  if(!gc) return;
-  if(isPanning)    gc.style.cursor = 'grabbing';
-  else if(isPanMode) gc.style.cursor = 'grab';
-  else               gc.style.cursor = 'crosshair';
-}
-
 // ── Init ──────────────────────────────────────────────────────────
 function initInteraction(){
   var wrap = document.getElementById('canvas-wrap');
 
-  // タッチ（スマホ）
+  // ── タッチ ──
   wrap.addEventListener('touchstart', onTouchStart, {passive:false});
   wrap.addEventListener('touchmove',  onTouchMove,  {passive:false});
   wrap.addEventListener('touchend',   onTouchEnd,   {passive:false});
   wrap.addEventListener('touchcancel',onTouchEnd,   {passive:false});
 
-  // マウス（PC）
-  wrap.addEventListener('mousedown',  onMouseDown);
-  wrap.addEventListener('mousemove',  onMouseMove);  // hover・描画用
-  wrap.addEventListener('mouseleave', onMouseLeave); // hover解除用
-  wrap.addEventListener('wheel',      onWheel, {passive:false});
-  // ※ パン中の mousemove/mouseup は動的に document へ登録（下記 startPan/stopPan）
+  // ── PC マウス：gc に直接バインド ──
+  // setPointerCapture でドラッグ中は gc 外でもイベントが届く
+  gc.addEventListener('pointerdown',  onPointerDown);
+  gc.addEventListener('pointermove',  onPointerMove);
+  gc.addEventListener('pointerup',    onPointerUp);
+  gc.addEventListener('pointercancel',onPointerUp);
+  gc.addEventListener('wheel',        onWheel, {passive:false});
 
-  // ツールバー
+  // ── ツールバー ──
   document.getElementById('btn-undo').addEventListener('click', undo);
   document.getElementById('btn-redo').addEventListener('click', redo);
   document.getElementById('btn-zi').addEventListener('click', function(){
@@ -256,7 +225,6 @@ function onTouchStart(e){
     isPointerDown    = false;
     touchDrawStarted = false;
     stampedSet       = new Set();
-
     var rect   = gc.getBoundingClientRect();
     var d      = ptDist(touches[0], touches[1]);
     var mid    = ptMid(touches[0], touches[1]);
@@ -275,7 +243,7 @@ function onTouchStart(e){
   touchStartX = t0.clientX;
   touchStartY = t0.clientY;
 
-  var cell = ptToCell(t0);
+  var cell = clientToCell(t0.clientX, t0.clientY);
   hoverC=cell.c; hoverR=cell.r;
   scheduleRender();
 
@@ -309,11 +277,8 @@ function onTouchMove(e){
     var mid   = ptMid(touches[0], touches[1]);
     var midX  = mid.x - rect.left;
     var midY  = mid.y - rect.top;
-
-    var rawScale = d / pinch0;
-    var scale    = Math.pow(rawScale, 0.75);
+    var scale    = Math.pow(d / pinch0, 0.75);
     var newZoom  = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, pinchZoom0 * scale));
-
     var zr = newZoom / pinchZoom0;
     panX = midX - (pinchMid0X - pinchPanX0) * zr;
     panY = midY - (pinchMid0Y - pinchPanY0) * zr;
@@ -324,16 +289,12 @@ function onTouchMove(e){
 
   cancelLongPress();
   if(!isPointerDown || touches.length !== 1) return;
-
   var t0   = touches[0];
   var dx   = t0.clientX - touchStartX;
   var dy   = t0.clientY - touchStartY;
-  var dist = Math.sqrt(dx*dx+dy*dy);
-
-  var cell = ptToCell(t0);
+  var cell = clientToCell(t0.clientX, t0.clientY);
   hoverC=cell.c; hoverR=cell.r;
-
-  if(!touchDrawStarted && dist < DRAW_THRESHOLD){
+  if(!touchDrawStarted && Math.sqrt(dx*dx+dy*dy) < DRAW_THRESHOLD){
     scheduleRender(); return;
   }
   touchDrawStarted = true;
@@ -342,43 +303,43 @@ function onTouchMove(e){
 
 function onTouchEnd(e){
   e.preventDefault();
-
   if(isPinching){
     if(e.touches.length < 2){
-      isPinching       = false;
-      isPointerDown    = false;
-      touchDrawStarted = false;
-      hoverC=-1; hoverR=-1;
-      scheduleRender();
+      isPinching=false; isPointerDown=false; touchDrawStarted=false;
+      hoverC=-1; hoverR=-1; scheduleRender();
     }
     return;
   }
-
   cancelLongPress();
-
   if(isPointerDown){
-    if(!touchDrawStarted){
-      handleDraw(stampStartC, stampStartR);
-    }
+    if(!touchDrawStarted) handleDraw(stampStartC, stampStartR);
     commitStamp();
   }
-
-  isPointerDown    = false;
-  touchDrawStarted = false;
-  hoverC=-1; hoverR=-1;
-  scheduleRender();
+  isPointerDown=false; touchDrawStarted=false;
+  hoverC=-1; hoverR=-1; scheduleRender();
 }
 
-// ── Mouse handlers（wrap にバインド）─────────────────────────────
-function onMouseDown(e){
-  // 左クリック＋パンモード、または中クリック → パン開始
-  if(e.button===1 || (e.button===0 && isPanMode)){
+// ── Pointer handlers（PC マウス：setPointerCapture で追跡）────────
+function onPointerDown(e){
+  // タッチは Touch handlers が処理
+  if(e.pointerType === 'touch') return;
+  if(e.button !== 0 && e.button !== 1) return;
+
+  // パンモード or 中クリック → パン開始
+  if(e.button === 1 || (e.button === 0 && isPanMode)){
     e.preventDefault();
-    startPan(e);
+    isPanning  = true;
+    panStartX  = e.clientX;
+    panStartY  = e.clientY;
+    panStartPX = panX;
+    panStartPY = panY;
+    // ★ setPointerCapture：ウィンドウ外に出ても pointermove/pointerup が届く
+    gc.setPointerCapture(e.pointerId);
+    updateCursor();
     return;
   }
-  if(e.button !== 0) return;
 
+  // 描画モード
   var cell = clientToCell(e.clientX, e.clientY);
   if(tool==='fill'){ pushUndo(); floodFill(cell.c,cell.r); return; }
   isPointerDown = true;
@@ -387,23 +348,31 @@ function onMouseDown(e){
   handleDraw(cell.c, cell.r);
 }
 
-function onMouseMove(e){
-  // hover・描画のみ（パンは _onPanMove が document レベルで処理）
-  if(isPanning) return;
+function onPointerMove(e){
+  if(e.pointerType === 'touch') return;
+
+  if(isPanning){
+    panX = panStartPX + (e.clientX - panStartX) * 0.88;
+    panY = panStartPY + (e.clientY - panStartY) * 0.88;
+    scheduleRender();
+    return;
+  }
+
   var cell = clientToCell(e.clientX, e.clientY);
   hoverC=cell.c; hoverR=cell.r;
   if(isPointerDown) handleDraw(cell.c, cell.r);
   scheduleRender();
 }
 
-function onMouseUp(e){
-  // パンは _onPanUp が処理するのでここでは描画終了のみ
-  if(isPointerDown){ commitStamp(); }
-  isPointerDown = false;
-}
+function onPointerUp(e){
+  if(e.pointerType === 'touch') return;
 
-function onMouseLeave(e){
-  if(isPanning) return; // パン中はwrap外でもonMouseMoveが継続
+  if(isPanning){
+    isPanning = false;
+    try{ gc.releasePointerCapture(e.pointerId); }catch(ex){}
+    updateCursor();
+    return;
+  }
   if(isPointerDown){ commitStamp(); }
   isPointerDown = false;
   hoverC=-1; hoverR=-1;
