@@ -1,6 +1,4 @@
 // interaction.js
-// Handles all pointer input: draw/erase/fill, pinch zoom, two-finger pan,
-// long-press context menu, undo/redo stack.
 
 var tool = 'draw';
 var isPointerDown    = false;
@@ -9,112 +7,82 @@ var stampedSet       = new Set();
 var stampStartC=-1,  stampStartR=-1;
 var longPressTimer   = null, lpC=-1, lpR=-1;
 
-// ── Pinch state ───────────────────────────────────────────────────
-var isPinching  = false;
-var pinch0      = 0;
-var pinchZoom0  = 1;
-var pinchPanX0  = 0, pinchPanY0  = 0;
-var pinchMid0X  = 0, pinchMid0Y  = 0;
+// ── Pinch ─────────────────────────────────────────────────────────
+var isPinching = false;
+var pinch0=0, pinchZoom0=1, pinchPanX0=0, pinchPanY0=0;
+var pinchMid0X=0, pinchMid0Y=0;
 
 // ── Touch draw threshold ──────────────────────────────────────────
-var touchDrawStarted = false;
-var touchStartX      = 0, touchStartY = 0;
-var DRAW_THRESHOLD   = 10;
+var touchDrawStarted=false, touchStartX=0, touchStartY=0;
+var DRAW_THRESHOLD=10;
 
-// ── Pan mode ──────────────────────────────────────────────────────
-var isPanMode  = false;
-var isPanning  = false;
-var panStartX  = 0, panStartY  = 0;
-var panStartPX = 0, panStartPY = 0;
+// ── Pan ───────────────────────────────────────────────────────────
+var isPanMode=false, isPanning=false;
+var panStartX=0, panStartY=0, panStartPX=0, panStartPY=0;
 
-var undoStack=[], redoStack=[];
-var MAX_UNDO=60;
+var undoStack=[], redoStack=[], MAX_UNDO=60;
 
-// ── Undo / Redo ───────────────────────────────────────────────────
+// ── Undo/Redo ─────────────────────────────────────────────────────
 function snapCells(){ return JSON.parse(JSON.stringify(cells)); }
-
 function pushUndo(){
   undoStack.push(snapCells());
   if(undoStack.length>MAX_UNDO) undoStack.shift();
-  redoStack=[];
-  updateUndoBtns();
+  redoStack=[]; updateUndoBtns();
 }
-
 function undo(){
   if(!undoStack.length) return;
-  redoStack.push(snapCells());
-  cells=undoStack.pop();
-  updateUndoBtns();
-  scheduleRender();
+  redoStack.push(snapCells()); cells=undoStack.pop();
+  updateUndoBtns(); scheduleRender();
 }
-
 function redo(){
   if(!redoStack.length) return;
-  undoStack.push(snapCells());
-  cells=redoStack.pop();
-  updateUndoBtns();
-  scheduleRender();
+  undoStack.push(snapCells()); cells=redoStack.pop();
+  updateUndoBtns(); scheduleRender();
 }
-
 function updateUndoBtns(){
-  var u=document.getElementById('btn-undo'), r=document.getElementById('btn-redo');
+  var u=document.getElementById('btn-undo'),r=document.getElementById('btn-redo');
   if(u) u.disabled=!undoStack.length;
   if(r) r.disabled=!redoStack.length;
 }
 
-// ── Place / Erase ─────────────────────────────────────────────────
+// ── Place/Erase ───────────────────────────────────────────────────
 function placeCell(c,r){
   if(!inGrid(c,r)) return;
-  var k=ck(c,r);
-  var rid=resolveId(selectedId);
-  if(cells[k] && cells[k].id===rid) return;
-  cells[k]={ id:rid, dir:'none' };
+  var k=ck(c,r), rid=resolveId(selectedId);
+  if(cells[k]&&cells[k].id===rid) return;
+  cells[k]={id:rid,dir:'none'};
   if(soundOn) playPlaceSound();
   scheduleRender();
 }
-
 function eraseCell(c,r){
   if(!inGrid(c,r)) return;
-  var k=ck(c,r);
-  if(!cells[k]) return;
-  delete cells[k];
-  scheduleRender();
+  var k=ck(c,r); if(!cells[k]) return;
+  delete cells[k]; scheduleRender();
 }
-
 function floodFill(c,r){
   if(!inGrid(c,r)) return;
-  var targetId = (cells[ck(c,r)]||{}).id||'__empty__';
+  var targetId=(cells[ck(c,r)]||{}).id||'__empty__';
   if(targetId===selectedId) return;
   pushUndo();
-  var queue=[[c,r]], visited=new Set();
+  var queue=[[c,r]],visited=new Set();
   while(queue.length){
-    var cur=queue.shift();
-    var kk=ck(cur[0],cur[1]);
-    if(visited.has(kk)) continue;
-    visited.add(kk);
+    var cur=queue.shift(),kk=ck(cur[0],cur[1]);
+    if(visited.has(kk)) continue; visited.add(kk);
     if(!inGrid(cur[0],cur[1])) continue;
-    var curId=(cells[kk]||{}).id||'__empty__';
-    if(curId!==targetId) continue;
+    if(((cells[kk]||{}).id||'__empty__')!==targetId) continue;
     cells[kk]={id:resolveId(selectedId),dir:'none'};
-    [[0,-1],[0,1],[-1,0],[1,0]].forEach(function(d){
-      queue.push([cur[0]+d[0],cur[1]+d[1]]);
-    });
+    [[0,-1],[0,1],[-1,0],[1,0]].forEach(function(d){ queue.push([cur[0]+d[0],cur[1]+d[1]]); });
   }
   scheduleRender();
 }
 
 // ── Sound ─────────────────────────────────────────────────────────
-var _audioCtx = null;
-var _pendingSound = false;
-
-function _tryInitAudio(){
-  if(_audioCtx) return;
-  try{ _audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
-}
+var _audioCtx=null,_pendingSound=false;
+function _tryInitAudio(){ if(_audioCtx) return; try{ _audioCtx=new(window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
 function _doPlaySound(){
   if(!_audioCtx) return;
   try{
-    var osc=_audioCtx.createOscillator(), g=_audioCtx.createGain();
+    var osc=_audioCtx.createOscillator(),g=_audioCtx.createGain();
     osc.connect(g); g.connect(_audioCtx.destination);
     osc.frequency.value=440+Math.random()*160;
     g.gain.setValueAtTime(0.08,_audioCtx.currentTime);
@@ -122,289 +90,192 @@ function _doPlaySound(){
     osc.start(); osc.stop(_audioCtx.currentTime+0.12);
   }catch(e){}
 }
-document.addEventListener('touchend', function(){
-  _tryInitAudio();
-  if(_pendingSound && soundOn) _doPlaySound();
-  _pendingSound = false;
-}, {passive:true});
-document.addEventListener('mouseup', function(){
-  _tryInitAudio();
-  if(_pendingSound && soundOn) _doPlaySound();
-  _pendingSound = false;
-}, {passive:true});
-function playPlaceSound(){ _pendingSound = true; }
+document.addEventListener('touchend',function(){ _tryInitAudio(); if(_pendingSound&&soundOn)_doPlaySound(); _pendingSound=false; },{passive:true});
+document.addEventListener('mouseup', function(){ _tryInitAudio(); if(_pendingSound&&soundOn)_doPlaySound(); _pendingSound=false; },{passive:true});
+function playPlaceSound(){ _pendingSound=true; }
 
 // ── Vibrate ───────────────────────────────────────────────────────
-function vibrateShort(){ if(vibeOn && navigator.vibrate) navigator.vibrate(18); }
-function vibrateLong(){  if(vibeOn && navigator.vibrate) navigator.vibrate(30); }
+function vibrateShort(){ if(vibeOn&&navigator.vibrate) navigator.vibrate(18); }
+function vibrateLong(){  if(vibeOn&&navigator.vibrate) navigator.vibrate(30); }
 
-// ── Coordinate helpers ────────────────────────────────────────────
-function clientToCell(cx, cy){
-  var rect = gc.getBoundingClientRect();
-  return screenToCell(cx - rect.left, cy - rect.top);
+// ── Coords ────────────────────────────────────────────────────────
+function clientToCell(cx,cy){
+  var r=gc.getBoundingClientRect();
+  return screenToCell(cx-r.left, cy-r.top);
 }
-function ptDist(t1,t2){
-  var dx=t1.clientX-t2.clientX, dy=t1.clientY-t2.clientY;
-  return Math.sqrt(dx*dx+dy*dy);
-}
-function ptMid(t1,t2){
-  return { x:(t1.clientX+t2.clientX)/2, y:(t1.clientY+t2.clientY)/2 };
-}
+function ptDist(a,b){ var dx=a.clientX-b.clientX,dy=a.clientY-b.clientY; return Math.sqrt(dx*dx+dy*dy); }
+function ptMid(a,b){ return {x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2}; }
 
-// ── Tool selection ────────────────────────────────────────────────
+// ── Tool ──────────────────────────────────────────────────────────
 function setTool(t2){
   tool=t2;
   ['draw','erase','fill'].forEach(function(tt){
-    var btn=document.getElementById('tool-'+tt);
-    if(btn) btn.classList.toggle('active',tt===t2);
+    var b=document.getElementById('tool-'+tt); if(b) b.classList.toggle('active',tt===t2);
   });
 }
 
-// ── Cursor helper ─────────────────────────────────────────────────
+// ── Cursor ────────────────────────────────────────────────────────
 function updateCursor(){
   if(!gc) return;
-  if(isPanning)      gc.style.cursor = 'grabbing';
-  else if(isPanMode) gc.style.cursor = 'grab';
-  else               gc.style.cursor = 'crosshair';
+  gc.style.cursor = isPanning ? 'grabbing' : (isPanMode ? 'grab' : 'crosshair');
 }
 
-// ── Pan mode toggle（btn-center 転用）────────────────────────────
+// ── Pan mode toggle ────────────────────────────────────────────────
 function togglePanMode(){
-  isPanMode = !isPanMode;
-  var btn = document.getElementById('btn-center');
-  if(btn) btn.classList.toggle('on', isPanMode);
+  isPanMode=!isPanMode;
+  var btn=document.getElementById('btn-center');
+  if(btn) btn.classList.toggle('on',isPanMode);
   updateCursor();
 }
 
 // ── Init ──────────────────────────────────────────────────────────
 function initInteraction(){
-  var wrap = document.getElementById('canvas-wrap');
+  var wrap=document.getElementById('canvas-wrap');
 
-  // ── タッチ ──
-  wrap.addEventListener('touchstart', onTouchStart, {passive:false});
-  wrap.addEventListener('touchmove',  onTouchMove,  {passive:false});
-  wrap.addEventListener('touchend',   onTouchEnd,   {passive:false});
-  wrap.addEventListener('touchcancel',onTouchEnd,   {passive:false});
+  // タッチ
+  wrap.addEventListener('touchstart',onTouchStart,{passive:false});
+  wrap.addEventListener('touchmove', onTouchMove, {passive:false});
+  wrap.addEventListener('touchend',  onTouchEnd,  {passive:false});
+  wrap.addEventListener('touchcancel',onTouchEnd, {passive:false});
 
-  // ── PC マウス：gc に直接バインド ──
-  // setPointerCapture でドラッグ中は gc 外でもイベントが届く
-  gc.addEventListener('pointerdown',  onPointerDown);
-  gc.addEventListener('pointermove',  onPointerMove);
-  gc.addEventListener('pointerup',    onPointerUp);
-  gc.addEventListener('pointercancel',onPointerUp);
-  gc.addEventListener('wheel',        onWheel, {passive:false});
+  // マウス（canvas-wrap に登録）
+  wrap.addEventListener('mousedown', onMouseDown);
+  wrap.addEventListener('wheel',     onWheel, {passive:false});
 
-  // ── ツールバー ──
-  document.getElementById('btn-undo').addEventListener('click', undo);
-  document.getElementById('btn-redo').addEventListener('click', redo);
-  document.getElementById('btn-zi').addEventListener('click', function(){
-    zoomAround(cw/2,ch/2,1.2); scheduleRender();
-  });
-  document.getElementById('btn-zo').addEventListener('click', function(){
-    zoomAround(cw/2,ch/2,0.83); scheduleRender();
-  });
-  document.getElementById('btn-center').addEventListener('click', togglePanMode);
+  // mousemove / mouseup は window に登録（要素の外でも確実に追跡）
+  window.addEventListener('mousemove', onWindowMouseMove);
+  window.addEventListener('mouseup',   onWindowMouseUp);
 
+  // ツールバー
+  document.getElementById('btn-undo').addEventListener('click',undo);
+  document.getElementById('btn-redo').addEventListener('click',redo);
+  document.getElementById('btn-zi').addEventListener('click',function(){ zoomAround(cw/2,ch/2,1.2); scheduleRender(); });
+  document.getElementById('btn-zo').addEventListener('click',function(){ zoomAround(cw/2,ch/2,0.83); scheduleRender(); });
+  document.getElementById('btn-center').addEventListener('click',togglePanMode);
   document.getElementById('tool-draw').addEventListener('click',  function(){ setTool('draw');  });
   document.getElementById('tool-erase').addEventListener('click', function(){ setTool('erase'); });
   document.getElementById('tool-fill').addEventListener('click',  function(){ setTool('fill');  });
-
-  document.getElementById('sel-preview').addEventListener('click', openSheet);
+  document.getElementById('sel-preview').addEventListener('click',openSheet);
 
   updateCursor();
   updateUndoBtns();
 }
 
-// ── Touch handlers ────────────────────────────────────────────────
+// ── Touch ─────────────────────────────────────────────────────────
 function onTouchStart(e){
   e.preventDefault();
-  var touches = e.touches;
-
-  if(touches.length >= 2){
-    cancelLongPress();
-    isPointerDown    = false;
-    touchDrawStarted = false;
-    stampedSet       = new Set();
-    var rect   = gc.getBoundingClientRect();
-    var d      = ptDist(touches[0], touches[1]);
-    var mid    = ptMid(touches[0], touches[1]);
-    isPinching  = true;
-    pinch0      = d;
-    pinchZoom0  = zoom;
-    pinchPanX0  = panX;
-    pinchPanY0  = panY;
-    pinchMid0X  = mid.x - rect.left;
-    pinchMid0Y  = mid.y - rect.top;
+  var ts=e.touches;
+  if(ts.length>=2){
+    cancelLongPress(); isPointerDown=false; touchDrawStarted=false; stampedSet=new Set();
+    var rect=gc.getBoundingClientRect(), d=ptDist(ts[0],ts[1]), mid=ptMid(ts[0],ts[1]);
+    isPinching=true; pinch0=d; pinchZoom0=zoom; pinchPanX0=panX; pinchPanY0=panY;
+    pinchMid0X=mid.x-rect.left; pinchMid0Y=mid.y-rect.top;
     return;
   }
-
-  isPinching = false;
-  var t0 = touches[0];
-  touchStartX = t0.clientX;
-  touchStartY = t0.clientY;
-
-  var cell = clientToCell(t0.clientX, t0.clientY);
-  hoverC=cell.c; hoverR=cell.r;
-  scheduleRender();
-
-  if(tool==='fill'){
-    pushUndo(); floodFill(cell.c,cell.r); return;
-  }
-
+  isPinching=false;
+  var t0=ts[0]; touchStartX=t0.clientX; touchStartY=t0.clientY;
+  var cell=clientToCell(t0.clientX,t0.clientY);
+  hoverC=cell.c; hoverR=cell.r; scheduleRender();
+  if(tool==='fill'){ pushUndo(); floodFill(cell.c,cell.r); return; }
   lpC=cell.c; lpR=cell.r;
   longPressTimer=setTimeout(function(){
-    if(getCell(lpC,lpR)){
-      vibrateLong();
-      openCtxMenu(lpC,lpR,t0.clientX,t0.clientY);
-    }
+    if(getCell(lpC,lpR)){ vibrateLong(); openCtxMenu(lpC,lpR,t0.clientX,t0.clientY); }
     longPressTimer=null;
-  }, 480);
-
-  isPointerDown    = true;
-  touchDrawStarted = false;
-  stampedSet       = new Set();
-  stampStartC      = cell.c;
-  stampStartR      = cell.r;
+  },480);
+  isPointerDown=true; touchDrawStarted=false; stampedSet=new Set();
+  stampStartC=cell.c; stampStartR=cell.r;
 }
-
 function onTouchMove(e){
   e.preventDefault();
-  var touches = e.touches;
-
-  if(touches.length >= 2 && isPinching){
-    var rect  = gc.getBoundingClientRect();
-    var d     = ptDist(touches[0], touches[1]);
-    var mid   = ptMid(touches[0], touches[1]);
-    var midX  = mid.x - rect.left;
-    var midY  = mid.y - rect.top;
-    var scale    = Math.pow(d / pinch0, 0.75);
-    var newZoom  = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, pinchZoom0 * scale));
-    var zr = newZoom / pinchZoom0;
-    panX = midX - (pinchMid0X - pinchPanX0) * zr;
-    panY = midY - (pinchMid0Y - pinchPanY0) * zr;
-    zoom = newZoom;
-    scheduleRender();
-    return;
-  }
-
-  cancelLongPress();
-  if(!isPointerDown || touches.length !== 1) return;
-  var t0   = touches[0];
-  var dx   = t0.clientX - touchStartX;
-  var dy   = t0.clientY - touchStartY;
-  var cell = clientToCell(t0.clientX, t0.clientY);
-  hoverC=cell.c; hoverR=cell.r;
-  if(!touchDrawStarted && Math.sqrt(dx*dx+dy*dy) < DRAW_THRESHOLD){
+  var ts=e.touches;
+  if(ts.length>=2&&isPinching){
+    var rect=gc.getBoundingClientRect(), d=ptDist(ts[0],ts[1]), mid=ptMid(ts[0],ts[1]);
+    var midX=mid.x-rect.left, midY=mid.y-rect.top;
+    var newZoom=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,pinchZoom0*Math.pow(d/pinch0,0.75)));
+    var zr=newZoom/pinchZoom0;
+    panX=midX-(pinchMid0X-pinchPanX0)*zr; panY=midY-(pinchMid0Y-pinchPanY0)*zr; zoom=newZoom;
     scheduleRender(); return;
   }
-  touchDrawStarted = true;
-  handleDraw(cell.c, cell.r);
+  cancelLongPress();
+  if(!isPointerDown||ts.length!==1) return;
+  var t0=ts[0], dx=t0.clientX-touchStartX, dy=t0.clientY-touchStartY;
+  var cell=clientToCell(t0.clientX,t0.clientY);
+  hoverC=cell.c; hoverR=cell.r;
+  if(!touchDrawStarted&&Math.sqrt(dx*dx+dy*dy)<DRAW_THRESHOLD){ scheduleRender(); return; }
+  touchDrawStarted=true; handleDraw(cell.c,cell.r);
 }
-
 function onTouchEnd(e){
   e.preventDefault();
-  if(isPinching){
-    if(e.touches.length < 2){
-      isPinching=false; isPointerDown=false; touchDrawStarted=false;
-      hoverC=-1; hoverR=-1; scheduleRender();
-    }
-    return;
-  }
+  if(isPinching){ if(e.touches.length<2){ isPinching=false; isPointerDown=false; touchDrawStarted=false; hoverC=-1; hoverR=-1; scheduleRender(); } return; }
   cancelLongPress();
-  if(isPointerDown){
-    if(!touchDrawStarted) handleDraw(stampStartC, stampStartR);
-    commitStamp();
-  }
-  isPointerDown=false; touchDrawStarted=false;
-  hoverC=-1; hoverR=-1; scheduleRender();
+  if(isPointerDown){ if(!touchDrawStarted) handleDraw(stampStartC,stampStartR); commitStamp(); }
+  isPointerDown=false; touchDrawStarted=false; hoverC=-1; hoverR=-1; scheduleRender();
 }
 
-// ── Pointer handlers（PC マウス：setPointerCapture で追跡）────────
-function onPointerDown(e){
-  // タッチは Touch handlers が処理
-  if(e.pointerType === 'touch') return;
-  if(e.button !== 0 && e.button !== 1) return;
-
-  // パンモード or 中クリック → パン開始
-  if(e.button === 1 || (e.button === 0 && isPanMode)){
+// ── Mouse ─────────────────────────────────────────────────────────
+function onMouseDown(e){
+  // パンモード or 中クリック
+  if(e.button===1||(e.button===0&&isPanMode)){
     e.preventDefault();
-    isPanning  = true;
-    panStartX  = e.clientX;
-    panStartY  = e.clientY;
-    panStartPX = panX;
-    panStartPY = panY;
-    // ★ setPointerCapture：ウィンドウ外に出ても pointermove/pointerup が届く
-    gc.setPointerCapture(e.pointerId);
+    isPanning=true;
+    panStartX=e.clientX; panStartY=e.clientY;
+    panStartPX=panX; panStartPY=panY;
     updateCursor();
     return;
   }
-
-  // 描画モード
-  var cell = clientToCell(e.clientX, e.clientY);
+  if(e.button!==0) return;
+  var cell=clientToCell(e.clientX,e.clientY);
   if(tool==='fill'){ pushUndo(); floodFill(cell.c,cell.r); return; }
-  isPointerDown = true;
-  stampStartC=cell.c; stampStartR=cell.r;
-  stampedSet=new Set();
-  handleDraw(cell.c, cell.r);
+  isPointerDown=true; stampStartC=cell.c; stampStartR=cell.r;
+  stampedSet=new Set(); handleDraw(cell.c,cell.r);
 }
 
-function onPointerMove(e){
-  if(e.pointerType === 'touch') return;
-
+// window レベルのイベント：要素外でも確実に動作
+function onWindowMouseMove(e){
   if(isPanning){
-    panX = panStartPX + (e.clientX - panStartX) * 0.88;
-    panY = panStartPY + (e.clientY - panStartY) * 0.88;
+    panX=panStartPX+(e.clientX-panStartX)*0.88;
+    panY=panStartPY+(e.clientY-panStartY)*0.88;
     scheduleRender();
     return;
   }
-
-  var cell = clientToCell(e.clientX, e.clientY);
+  // canvas内にある場合のみhover・描画
+  var rect=gc.getBoundingClientRect();
+  if(e.clientX<rect.left||e.clientX>rect.right||e.clientY<rect.top||e.clientY>rect.bottom){
+    if(hoverC>=0){ hoverC=-1; hoverR=-1; scheduleRender(); }
+    if(isPointerDown){ commitStamp(); isPointerDown=false; }
+    return;
+  }
+  var cell=clientToCell(e.clientX,e.clientY);
   hoverC=cell.c; hoverR=cell.r;
-  if(isPointerDown) handleDraw(cell.c, cell.r);
+  if(isPointerDown) handleDraw(cell.c,cell.r);
   scheduleRender();
 }
 
-function onPointerUp(e){
-  if(e.pointerType === 'touch') return;
-
+function onWindowMouseUp(e){
   if(isPanning){
-    isPanning = false;
-    try{ gc.releasePointerCapture(e.pointerId); }catch(ex){}
+    isPanning=false;
     updateCursor();
     return;
   }
   if(isPointerDown){ commitStamp(); }
-  isPointerDown = false;
-  hoverC=-1; hoverR=-1;
-  scheduleRender();
+  isPointerDown=false;
 }
 
 function onWheel(e){
   e.preventDefault();
-  var rect = gc.getBoundingClientRect();
-  var f = e.deltaY < 0 ? 1.08 : 0.93;
-  zoomAround(e.clientX - rect.left, e.clientY - rect.top, f);
+  var rect=gc.getBoundingClientRect();
+  zoomAround(e.clientX-rect.left, e.clientY-rect.top, e.deltaY<0?1.08:0.93);
   scheduleRender();
 }
 
 // ── Draw logic ────────────────────────────────────────────────────
 function handleDraw(c,r){
   if(!inGrid(c,r)) return;
-  var k=ck(c,r);
-  if(stampedSet.has(k)) return;
+  var k=ck(c,r); if(stampedSet.has(k)) return;
   stampedSet.add(k);
-  if(tool==='draw'){
-    if(stampedSet.size===1) pushUndo();
-    placeCell(c,r);
-  } else if(tool==='erase'){
-    if(stampedSet.size===1) pushUndo();
-    eraseCell(c,r);
-  }
+  if(tool==='draw'){ if(stampedSet.size===1) pushUndo(); placeCell(c,r); }
+  else if(tool==='erase'){ if(stampedSet.size===1) pushUndo(); eraseCell(c,r); }
   lastC=c; lastR=r;
 }
-
 function commitStamp(){ stampedSet=new Set(); }
-
-function cancelLongPress(){
-  if(longPressTimer){ clearTimeout(longPressTimer); longPressTimer=null; }
-}
+function cancelLongPress(){ if(longPressTimer){ clearTimeout(longPressTimer); longPressTimer=null; } }
