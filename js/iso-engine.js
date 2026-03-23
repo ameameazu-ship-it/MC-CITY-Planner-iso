@@ -12,6 +12,40 @@ var hoverC = -1, hoverR = -1;
 var dirty = true;
 var gc, ov, gctx, octx, cw, ch;
 
+// ── Block placement animation ────────────────────────────────────
+var blockAnims   = {};   // ck(c,r) -> startTime(ms)
+var ANIM_DURATION = 320; // ms
+
+function triggerBlockAnim(c, r){
+  blockAnims[ck(c,r)] = performance.now();
+  dirty = false;
+  scheduleRender();
+}
+
+// t=0→1 の pop スケール曲線
+// 0→1.22（前半）→ 1.0（後半）でスプリング感
+function _popScale(t){
+  if(t <= 0)   return 0;
+  if(t >= 1)   return 1;
+  if(t < 0.45){
+    // 加速しながら 0 → 1.22
+    var u = t / 0.45;
+    return 1.22 * u * u;
+  } else {
+    // 1.22 → 1.0 にバウンス
+    var u = (t - 0.45) / 0.55;
+    return 1.22 - 0.22 * (3*u*u - 2*u*u*u); // smoothstep で収束
+  }
+}
+
+function getBlockScale(c, r){
+  var key = ck(c,r);
+  if(!blockAnims[key]) return 1;
+  var elapsed = performance.now() - blockAnims[key];
+  if(elapsed >= ANIM_DURATION){ delete blockAnims[key]; return 1; }
+  return _popScale(elapsed / ANIM_DURATION);
+}
+
 // ── Background theme ─────────────────────────────────────────────
 var bgTheme = 'default';
 
@@ -297,7 +331,19 @@ function render(){
     var cell=getCell(c,r);
     if(cell){
       var s=cellToScreen(c,r);
-      drawBlock(gctx, c, r, s.x, s.y, cell.id, cell.dir);
+      var scale=getBlockScale(c,r);
+      if(scale!==1){
+        // タイル中心を基準にスケール変換
+        var cx=s.x, cy=s.y+HH*zoom;
+        gctx.save();
+        gctx.translate(cx,cy);
+        gctx.scale(scale,scale);
+        gctx.translate(-cx,-cy);
+        drawBlock(gctx,c,r,s.x,s.y,cell.id,cell.dir);
+        gctx.restore();
+      } else {
+        drawBlock(gctx,c,r,s.x,s.y,cell.id,cell.dir);
+      }
     }
   });
 
@@ -308,6 +354,10 @@ function render(){
   }
 
   dirty=false;
+  // アニメーション中のブロックがあれば次フレームも描画
+  if(Object.keys(blockAnims).length > 0){
+    requestAnimationFrame(render);
+  }
 }
 
 function scheduleRender(){
