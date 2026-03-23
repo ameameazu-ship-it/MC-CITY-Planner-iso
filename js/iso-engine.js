@@ -23,18 +23,18 @@ function triggerBlockAnim(c, r){
 }
 
 // t=0→1 の pop スケール曲線
-// 0→1.22（前半）→ 1.0（後半）でスプリング感
+// 0→1.50（前半）→ 1.0（後半）でスプリング感
 function _popScale(t){
   if(t <= 0)   return 0;
   if(t >= 1)   return 1;
   if(t < 0.45){
-    // 加速しながら 0 → 1.22
+    // 加速しながら 0 → 1.50
     var u = t / 0.45;
-    return 1.22 * u * u;
+    return 1.50 * u * u;
   } else {
-    // 1.22 → 1.0 にバウンス
+    // 1.50 → 1.0 にバウンス
     var u = (t - 0.45) / 0.55;
-    return 1.22 - 0.22 * (3*u*u - 2*u*u*u); // smoothstep で収束
+    return 1.50 - 0.50 * (3*u*u - 2*u*u*u); // smoothstep で収束
   }
 }
 
