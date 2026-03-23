@@ -15,15 +15,38 @@ var gc, ov, gctx, octx, cw, ch;
 // ── Background theme ─────────────────────────────────────────────
 var bgTheme = 'default';
 
-// テーマごとのカラーパレット: [空グラデ上, 空グラデ下, 地面(昼), 地面(夜), グリッド線]
+// テーマごとのカラーパレット:
+// [空top昼, 空bot昼, 地面昼, 地面夜, グリッド線, 空top夜, 空bot夜]
 var BG_THEMES = {
-  //            空top       空bot       地面昼      地面夜      グリッド線
-  'default': ['#0d0d12', '#05050a', '#1a1a22', '#0e0e16', 'rgba(255,255,255,0.13)'],
-  'grass'  : ['#0e4020', '#061a08', '#2e5a30', '#0e2410', 'rgba(255,255,255,0.12)'],
-  'desert' : ['#5a3010', '#2e1808', '#8c6030', '#4a3010', 'rgba(0,0,0,0.20)'],
-  'snow'   : ['#4a7aaa', '#1e3a60', '#7aaccc', '#3a607a', 'rgba(20,50,90,0.30)'],
-  'ocean'  : ['#040e22', '#020810', '#0a3060', '#050f28', 'rgba(255,255,255,0.14)'],
-  'stone'  : ['#1e1e28', '#0c0c14', '#48485a', '#242430', 'rgba(255,255,255,0.11)']
+  // ブラック: 星空の宇宙夜景。深い藍紫の夜空＋ほぼ黒の地面
+  'default': ['#0d0d12', '#05050a', '#1a1a22', '#10101a',
+              'rgba(255,255,255,0.13)',
+              '#0a0a2e', '#04041a'],
+
+  // グリーン: 森の夜。深緑の夜空＋月明かりに染まる暗緑の地面
+  'grass'  : ['#0e4020', '#061a08', '#2e5a30', '#0c2212',
+              'rgba(255,255,255,0.12)',
+              '#061428', '#030c10'],
+
+  // サンド: 砂漠の夜。暖色系の夜空＋月明かりが当たった砂色の地面
+  'desert' : ['#5a3010', '#2e1808', '#8c6030', '#5a3e1a',
+              'rgba(0,0,0,0.20)',
+              '#180e28', '#0c0814'],
+
+  // スノー: 雪の夜景。月明かりで輝く青白い地面が映える
+  'snow'   : ['#4a7aaa', '#1e3a60', '#7aaccc', '#7aaac0',
+              'rgba(20,50,90,0.30)',
+              '#0c1e3e', '#060e22'],
+
+  // ネイビー: 深海の夜。漆黒の海＋わずかに光る深紺の地面
+  'ocean'  : ['#040e22', '#020810', '#0a3060', '#061838',
+              'rgba(255,255,255,0.14)',
+              '#020614', '#01030c'],
+
+  // グレー: 都市の夜景。青みがかった夜空＋薄く光る石畳の地面
+  'stone'  : ['#1e1e28', '#0c0c14', '#48485a', '#28283c',
+              'rgba(255,255,255,0.11)',
+              '#0e0e22', '#06060e']
 };
 
 function getBgPalette(){
@@ -237,10 +260,10 @@ function render(){
 
   // Sky background
   if(nightMode){
-    // 夜間もテーマ色を暗く反映
+    // テーマ専用の夜空色を使用（pal[5], pal[6]）
     var sky=gctx.createLinearGradient(0,0,0,ch);
-    sky.addColorStop(0, shadeC(pal[0], 0.28));
-    sky.addColorStop(1, shadeC(pal[1], 0.22));
+    sky.addColorStop(0, pal[5] || shadeC(pal[0], 0.28));
+    sky.addColorStop(1, pal[6] || shadeC(pal[1], 0.22));
     gctx.fillStyle=sky; gctx.fillRect(0,0,cw,ch);
   } else {
     var sky2=gctx.createLinearGradient(0,0,0,ch);
@@ -262,7 +285,9 @@ function render(){
     var c=cr[0], r=cr[1];
     var s=cellToScreen(c,r);
     var gfill  = nightMode ? pal[3] : pal[2];
-    var gstroke= showGrid  ? (nightMode ? 'rgba(255,255,255,0.06)' : pal[4]) : null;
+    // 夜間グリッド: スノーは地面が明るいので暗い線、それ以外は白系
+    var nightGrid = (bgTheme === 'snow') ? 'rgba(30,70,120,0.35)' : 'rgba(255,255,255,0.09)';
+    var gstroke= showGrid  ? (nightMode ? nightGrid : pal[4]) : null;
     drawDiamond(gctx, s.x, s.y, gfill, gstroke, 0.5);
   });
 
