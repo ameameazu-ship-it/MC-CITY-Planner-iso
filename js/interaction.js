@@ -110,43 +110,43 @@ function _mcPlaceSound(pitchMult){
     out.gain.setValueAtTime(1.0, t);
     out.connect(ctx.destination);
 
-    // ── 1. ノイズバースト（ザクッという質感）──────────────────
-    var bufSize = ctx.sampleRate * 0.06;
+    // ── 1. 高域ノイズ（パッという軽い質感）──────────────────
+    var bufSize = Math.floor(ctx.sampleRate * 0.035);
     var buf     = ctx.createBuffer(1, bufSize, ctx.sampleRate);
     var data    = buf.getChannelData(0);
     for(var i=0; i<bufSize; i++) data[i] = (Math.random()*2-1);
 
-    var noise   = ctx.createBufferSource();
+    var noise = ctx.createBufferSource();
     noise.buffer = buf;
 
-    // バンドパスフィルタ：木材っぽい帯域（400-800Hz）
-    var bp = ctx.createBiquadFilter();
-    bp.type            = 'bandpass';
-    bp.frequency.value = 600 * pitchMult;
-    bp.Q.value         = 1.2;
+    // ハイパスフィルタ：軽い高域成分のみ通す
+    var hp = ctx.createBiquadFilter();
+    hp.type            = 'highpass';
+    hp.frequency.value = 1800 * pitchMult;
+    hp.Q.value         = 0.8;
 
     var noiseGain = ctx.createGain();
-    noiseGain.gain.setValueAtTime(0.22, t);
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.055);
+    noiseGain.gain.setValueAtTime(0.18, t);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
 
-    noise.connect(bp);
-    bp.connect(noiseGain);
+    noise.connect(hp);
+    hp.connect(noiseGain);
     noiseGain.connect(out);
-    noise.start(t); noise.stop(t + 0.06);
+    noise.start(t); noise.stop(t + 0.035);
 
-    // ── 2. 低音サイン波（ドシュというボディ感）────────────────
+    // ── 2. 中高音サイン波（パという明るいトーン）────────────
     var body = ctx.createOscillator();
     body.type = 'sine';
-    body.frequency.setValueAtTime(130 * pitchMult, t);
-    body.frequency.exponentialRampToValueAtTime(60 * pitchMult, t + 0.07);
+    body.frequency.setValueAtTime(600 * pitchMult, t);
+    body.frequency.exponentialRampToValueAtTime(300 * pitchMult, t + 0.04);
 
     var bodyGain = ctx.createGain();
-    bodyGain.gain.setValueAtTime(0.28, t);
-    bodyGain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+    bodyGain.gain.setValueAtTime(0.14, t);
+    bodyGain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
 
     body.connect(bodyGain);
     bodyGain.connect(out);
-    body.start(t); body.stop(t + 0.07);
+    body.start(t); body.stop(t + 0.04);
 
   }catch(e){}
 }
