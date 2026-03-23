@@ -11,6 +11,7 @@ var longPressTimer   = null, lpC=-1, lpR=-1;
 var stampMode        = false;   // 長押しで解放された連続配置モード
 var STAMP_LONG_MS    = 550;     // 長押し判定 ms（コンテキストより少し短め）
 var stampLPTimer     = null;    // スタンプ用長押しタイマー
+var undoPushed       = false;   // 1配置セッションで1回だけpushUndoを呼ぶフラグ
 
 // ── Pinch ─────────────────────────────────────────────────────────
 var isPinching = false;
@@ -56,15 +57,8 @@ function placeCell(c,r){
   var k=ck(c,r), rid=resolveId(selectedId);
   if(cells[k]&&cells[k].id===rid) return;
   cells[k]={id:rid,dir:'none'};
-  if(soundOn){
-    if(stampMode){
-      // 連続配置：即時再生（pendingを使わず直接鳴らす）
-      _tryInitAudio();
-      _doPlaySound();
-    } else {
-      playPlaceSound();
-    }
-  }
+  // 常に直接再生（pending方式はtouchend順序の問題で鳴らないため）
+  if(soundOn){ _tryInitAudio(); _doPlaySound(); }
   // ポップアニメーション発火
   triggerBlockAnim(c,r);
   scheduleRender();
@@ -336,9 +330,14 @@ function handleDraw(c,r){
   if(tool==='draw' && !stampMode && stampedSet.size >= 1) return;
   if(stampedSet.has(k)) return;
   stampedSet.add(k);
-  if(tool==='draw'){ if(stampedSet.size===1) pushUndo(); placeCell(c,r); }
-  else if(tool==='erase'){ if(stampedSet.size===1) pushUndo(); eraseCell(c,r); }
+  // pushUndo はセッション全体で1回だけ
+  if(!undoPushed){
+    pushUndo();
+    undoPushed = true;
+  }
+  if(tool==='draw')  placeCell(c,r);
+  else if(tool==='erase') eraseCell(c,r);
   lastC=c; lastR=r;
 }
-function commitStamp(){ stampedSet=new Set(); }
+function commitStamp(){ stampedSet=new Set(); undoPushed=false; }
 function cancelLongPress(){ if(longPressTimer){ clearTimeout(longPressTimer); longPressTimer=null; } }
