@@ -138,11 +138,11 @@ function initInteraction(){
   wrap.addEventListener('touchend',  onTouchEnd,  {passive:false});
   wrap.addEventListener('touchcancel',onTouchEnd, {passive:false});
 
-  // マウス：全て window に登録（要素を問わず確実に動作）
-  window.addEventListener('mousedown', onWindowMouseDown);
+  // mousedown は canvas-wrap に登録
+  wrap.addEventListener('mousedown', onMouseDown);
+  // mousemove / mouseup は window に登録（canvas外でも追跡）
   window.addEventListener('mousemove', onWindowMouseMove);
   window.addEventListener('mouseup',   onWindowMouseUp);
-  // wheel は wrap（スクロール防止のため）
   wrap.addEventListener('wheel', onWheel, {passive:false});
 
   // ツールバー
@@ -211,32 +211,22 @@ function onTouchEnd(e){
   isPointerDown=false; touchDrawStarted=false; hoverC=-1; hoverR=-1; scheduleRender();
 }
 
-// ── Mouse（全て window レベル）────────────────────────────────────
-function _isOnCanvas(e){
-  // クリック位置が canvas-wrap 内かどうか
-  var wrap=document.getElementById('canvas-wrap');
-  return wrap && wrap.contains(e.target);
-}
+// ── Mouse ────────────────────────────────────────────────────────
+// 差分方式（delta）で pan を実装
+var _lastMouseX = 0, _lastMouseY = 0;
 
-function onWindowMouseDown(e){
-  if(e.button!==0 && e.button!==1) return;
-
-  // パンモード or 中クリック（canvas上のみ）
+function onMouseDown(e){
+  // パンモード or 中クリック → pan 開始
   if(e.button===1 || (e.button===0 && isPanMode)){
-    if(!_isOnCanvas(e)) return;
     e.preventDefault();
-    isPanning  = true;
-    panStartX  = e.clientX;
-    panStartY  = e.clientY;
-    panStartPX = panX;
-    panStartPY = panY;
+    isPanning   = true;
+    _lastMouseX = e.clientX;
+    _lastMouseY = e.clientY;
     updateCursor();
     return;
   }
-
-  // 描画モード（canvas上のみ）
-  if(!_isOnCanvas(e)) return;
   if(e.button!==0) return;
+  // 描画
   var cell=clientToCell(e.clientX,e.clientY);
   if(tool==='fill'){ pushUndo(); floodFill(cell.c,cell.r); return; }
   isPointerDown=true; stampStartC=cell.c; stampStartR=cell.r;
@@ -245,14 +235,16 @@ function onWindowMouseDown(e){
 
 function onWindowMouseMove(e){
   if(isPanning){
-    panX = panStartPX + (e.clientX - panStartX) * 0.88;
-    panY = panStartPY + (e.clientY - panStartY) * 0.88;
-    // scheduleRenderではなくrender()直呼び（確実に再描画）
-    dirty = false;
-    scheduleRender();
+    var dx = e.clientX - _lastMouseX;
+    var dy = e.clientY - _lastMouseY;
+    panX += dx;
+    panY += dy;
+    _lastMouseX = e.clientX;
+    _lastMouseY = e.clientY;
+    render();   // 直接呼び出しで確実に再描画
     return;
   }
-  // canvas外ならhover解除
+  // hover・描画（canvas内のみ）
   var rect=gc.getBoundingClientRect();
   var inside = e.clientX>=rect.left && e.clientX<=rect.right &&
                e.clientY>=rect.top  && e.clientY<=rect.bottom;
