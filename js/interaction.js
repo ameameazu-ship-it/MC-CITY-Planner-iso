@@ -57,8 +57,8 @@ function placeCell(c,r){
   var k=ck(c,r), rid=resolveId(selectedId);
   if(cells[k]&&cells[k].id===rid) return;
   cells[k]={id:rid,dir:'none'};
-  // キューに積む → touchend/mouseup の _flushSound で再生
-  if(soundOn) playPlaceSound();
+  // gesture内（touchend/mouseup）で直接再生
+  playPlaceSound();
   // ポップアニメーション発火
   triggerBlockAnim(c,r);
   scheduleRender();
@@ -86,47 +86,45 @@ function floodFill(c,r){
 }
 
 // ── Sound ─────────────────────────────────────────────────────────
-var _audioCtx   = null;
-var _soundQueue = 0;   // 鳴らす音の数をキュー
+var _audioCtx    = null;
+var _audioReady  = false;  // resume済みフラグ
 
-function _tryInitAudio(){
+// touchstart（最初のタッチ）で AudioContext を作成・resume
+// → この時点は確実に user gesture 内なので iOS でも動く
+function _initAudioOnGesture(){
   if(_audioCtx) return;
-  try{ _audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
-}
-
-function _doPlaySound(){
-  if(!_audioCtx) return;
-  // suspended 状態（iOS）なら resume してから再生
-  if(_audioCtx.state === 'suspended'){
-    _audioCtx.resume().then(function(){ _doPlaySound(); });
-    return;
-  }
   try{
-    var osc = _audioCtx.createOscillator();
-    var g   = _audioCtx.createGain();
-    osc.connect(g); g.connect(_audioCtx.destination);
-    osc.frequency.value = 440 + Math.random()*160;
-    g.gain.setValueAtTime(0.08, _audioCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime+0.12);
-    osc.start(); osc.stop(_audioCtx.currentTime+0.12);
+    _audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    // 作成直後に resume（iOS は autoplay policy で suspended になるため）
+    _audioCtx.resume().then(function(){ _audioReady=true; }).catch(function(){});
   }catch(e){}
 }
 
-// gesture イベントで AudioContext を初期化＆キューを消化
-function _flushSound(){
-  _tryInitAudio();
-  if(!soundOn){ _soundQueue=0; return; }
-  while(_soundQueue > 0){
-    _doPlaySound();
-    _soundQueue--;
-  }
-}
-document.addEventListener('touchend', _flushSound, {passive:true});
-document.addEventListener('mouseup',  _flushSound, {passive:true});
+// touchstart と mousedown で確実に初期化
+document.addEventListener('touchstart', _initAudioOnGesture, {passive:true, once:false});
+document.addEventListener('mousedown',  _initAudioOnGesture, {passive:true, once:false});
 
-// placeCell から呼ぶ：キューに積む
+function _doPlaySound(){
+  if(!_audioCtx) return;
+  if(!soundOn) return;
+  try{
+    var ctx = _audioCtx;
+    // suspended なら同期的に resume してそのまま続行（Promiseを待たない）
+    if(ctx.state === 'suspended') ctx.resume();
+    var osc = ctx.createOscillator();
+    var g   = ctx.createGain();
+    osc.connect(g); g.connect(ctx.destination);
+    osc.frequency.value = 500 + Math.random()*200;
+    g.gain.setValueAtTime(0.10, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.15);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime+0.15);
+  }catch(e){}
+}
+
+// placeCell から呼ぶ（gesture内で直接再生）
 function playPlaceSound(){
-  _soundQueue++;
+  _doPlaySound();
 }
 
 // ── Vibrate ───────────────────────────────────────────────────────
@@ -251,6 +249,7 @@ function onTouchMove(e){
   if(stampMode){
     // 連続配置モード：毎フレーム置ける（stampedSet を無効化）
     stampedSet = new Set();
+    vibrateShort();
   }
   handleDraw(cell.c,cell.r);
 }
@@ -260,7 +259,10 @@ function onTouchEnd(e){
   cancelLongPress();
   if(stampLPTimer){ clearTimeout(stampLPTimer); stampLPTimer=null; }
   if(isPointerDown){
-    if(!touchDrawStarted&&!stampMode) handleDraw(stampStartC,stampStartR);
+    if(!touchDrawStarted&&!stampMode){
+      vibrateShort();
+      handleDraw(stampStartC,stampStartR);
+    }
     commitStamp();
   }
   isPointerDown=false; touchDrawStarted=false; stampMode=false; hoverC=-1; hoverR=-1; scheduleRender();
