@@ -57,8 +57,8 @@ function placeCell(c,r){
   var k=ck(c,r), rid=resolveId(selectedId);
   if(cells[k]&&cells[k].id===rid) return;
   cells[k]={id:rid,dir:'none'};
-  // 常に直接再生（pending方式はtouchend順序の問題で鳴らないため）
-  if(soundOn){ _tryInitAudio(); _doPlaySound(); }
+  // キューに積む → touchend/mouseup の _flushSound で再生
+  if(soundOn) playPlaceSound();
   // ポップアニメーション発火
   triggerBlockAnim(c,r);
   scheduleRender();
@@ -86,22 +86,48 @@ function floodFill(c,r){
 }
 
 // ── Sound ─────────────────────────────────────────────────────────
-var _audioCtx=null,_pendingSound=false;
-function _tryInitAudio(){ if(_audioCtx) return; try{ _audioCtx=new(window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+var _audioCtx   = null;
+var _soundQueue = 0;   // 鳴らす音の数をキュー
+
+function _tryInitAudio(){
+  if(_audioCtx) return;
+  try{ _audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
+}
+
 function _doPlaySound(){
   if(!_audioCtx) return;
+  // suspended 状態（iOS）なら resume してから再生
+  if(_audioCtx.state === 'suspended'){
+    _audioCtx.resume().then(function(){ _doPlaySound(); });
+    return;
+  }
   try{
-    var osc=_audioCtx.createOscillator(),g=_audioCtx.createGain();
+    var osc = _audioCtx.createOscillator();
+    var g   = _audioCtx.createGain();
     osc.connect(g); g.connect(_audioCtx.destination);
-    osc.frequency.value=440+Math.random()*160;
-    g.gain.setValueAtTime(0.08,_audioCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001,_audioCtx.currentTime+0.12);
+    osc.frequency.value = 440 + Math.random()*160;
+    g.gain.setValueAtTime(0.08, _audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime+0.12);
     osc.start(); osc.stop(_audioCtx.currentTime+0.12);
   }catch(e){}
 }
-document.addEventListener('touchend',function(){ _tryInitAudio(); if(_pendingSound&&soundOn)_doPlaySound(); _pendingSound=false; },{passive:true});
-document.addEventListener('mouseup', function(){ _tryInitAudio(); if(_pendingSound&&soundOn)_doPlaySound(); _pendingSound=false; },{passive:true});
-function playPlaceSound(){ _pendingSound=true; }
+
+// gesture イベントで AudioContext を初期化＆キューを消化
+function _flushSound(){
+  _tryInitAudio();
+  if(!soundOn){ _soundQueue=0; return; }
+  while(_soundQueue > 0){
+    _doPlaySound();
+    _soundQueue--;
+  }
+}
+document.addEventListener('touchend', _flushSound, {passive:true});
+document.addEventListener('mouseup',  _flushSound, {passive:true});
+
+// placeCell から呼ぶ：キューに積む
+function playPlaceSound(){
+  _soundQueue++;
+}
 
 // ── Vibrate ───────────────────────────────────────────────────────
 function vibrateShort(){ if(vibeOn&&navigator.vibrate) navigator.vibrate(18); }
