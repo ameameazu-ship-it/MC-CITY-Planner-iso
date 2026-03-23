@@ -8,8 +8,28 @@ var lastC=-1, lastR=-1;
 var stampedSet = new Set();
 var stampStartC=-1, stampStartR=-1;
 var longPressTimer=null, lpC=-1, lpR=-1;
-var isPinching=false, pinch0=0, pPanX0=0, pPanY0=0, pinchMidX=0, pinchMidY=0;
-var isTfPan=false, tf0X=0, tf0Y=0, tfPX0=0, tfPY0=0;
+
+// ── Pinch state（非増分方式：ズレなし）──────────────────────────────
+var isPinching    = false;
+var pinch0        = 0;          // 開始時の指間距離
+var pinchZoom0    = 1;          // 開始時のzoom
+var pinchPanX0    = 0;          // 開始時のpanX
+var pinchPanY0    = 0;          // 開始時のpanY
+var pinchMid0X    = 0;          // 開始時の指中点（canvas座標）
+var pinchMid0Y    = 0;
+
+// ── Touch draw state（意図しない設置を防ぐ）───────────────────────
+var touchDrawStarted = false;   // 閾値を超えてから描画開始
+var touchStartX      = 0;       // タッチ開始位置（ページ座標）
+var touchStartY      = 0;
+var DRAW_THRESHOLD   = 10;      // px：これ以上動いたらドラッグ描画
+
+// ── PC パンモード（btn-center を転用）─────────────────────────────
+var isPanMode  = false;         // パンモードON/OFF
+var isPanning  = false;
+var panStartX  = 0, panStartY  = 0;
+var panStartPX = 0, panStartPY = 0;
+
 var undoStack=[], redoStack=[];
 var MAX_UNDO=60;
 
@@ -107,7 +127,6 @@ function _doPlaySound(){
   }catch(e){}
 }
 
-// touchend/mouseupで実際に音を鳴らす（touchstartではAudioContext生成不可）
 document.addEventListener('touchend', function(){
   _tryInitAudio();
   if(_pendingSound && soundOn){ _doPlaySound(); }
@@ -119,9 +138,7 @@ document.addEventListener('mouseup', function(){
   _pendingSound = false;
 }, {passive:true});
 
-function playPlaceSound(){
-  _pendingSound = true; // touchend/mouseupで発火
-}
+function playPlaceSound(){ _pendingSound = true; }
 
 // ── Vibrate ───────────────────────────────────────────────────────
 function vibrateShort(){ if(vibeOn && navigator.vibrate) navigator.vibrate(18); }
@@ -152,37 +169,50 @@ function setTool(t2){
   });
 }
 
-// ── Canvas pointer events ─────────────────────────────────────────
+// ── Pan mode toggle（btn-center 転用）────────────────────────────
+function togglePanMode(){
+  isPanMode = !isPanMode;
+  var btn = document.getElementById('btn-center');
+  if(btn) btn.classList.toggle('on', isPanMode);
+  // カーソル切り替え
+  if(gc) gc.style.cursor = isPanMode ? 'grab' : 'crosshair';
+}
+
+// ── Init ──────────────────────────────────────────────────────────
 function initInteraction(){
   var wrap=document.getElementById('canvas-wrap');
 
-  // Touch events
   wrap.addEventListener('touchstart', onTouchStart, {passive:false});
   wrap.addEventListener('touchmove',  onTouchMove,  {passive:false});
   wrap.addEventListener('touchend',   onTouchEnd,   {passive:false});
   wrap.addEventListener('touchcancel',onTouchEnd,   {passive:false});
 
-  // Mouse events (desktop)
   gc.addEventListener('mousedown',  onMouseDown);
   gc.addEventListener('mousemove',  onMouseMove);
   gc.addEventListener('mouseup',    onMouseUp);
-  gc.addEventListener('mouseleave', onMouseUp);
+  gc.addEventListener('mouseleave', onMouseLeave);
   gc.addEventListener('wheel',      onWheel, {passive:false});
+  // 中クリック（ホイールボタン）でのスクロール防止
+  gc.addEventListener('auxclick', function(e){ e.preventDefault(); });
 
-  // Toolbar buttons
   document.getElementById('btn-undo').addEventListener('click', undo);
   document.getElementById('btn-redo').addEventListener('click', redo);
-  document.getElementById('btn-zi').addEventListener('click', function(){ zoomAround(cw/2,ch/2,1.25); scheduleRender(); });
-  document.getElementById('btn-zo').addEventListener('click', function(){ zoomAround(cw/2,ch/2,0.8);  scheduleRender(); });
-  document.getElementById('btn-center').addEventListener('click', function(){ centerView(); scheduleRender(); });
+  document.getElementById('btn-zi').addEventListener('click', function(){
+    zoomAround(cw/2,ch/2,1.2); scheduleRender();
+  });
+  document.getElementById('btn-zo').addEventListener('click', function(){
+    zoomAround(cw/2,ch/2,0.83); scheduleRender();
+  });
+  // btn-center → パンモードトグルに転用
+  document.getElementById('btn-center').addEventListener('click', togglePanMode);
 
   document.getElementById('tool-draw').addEventListener('click',  function(){ setTool('draw');  });
   document.getElementById('tool-erase').addEventListener('click', function(){ setTool('erase'); });
   document.getElementById('tool-fill').addEventListener('click',  function(){ setTool('fill');  });
 
-  // sel-preview click → open sheet
   document.getElementById('sel-preview').addEventListener('click', openSheet);
 
+  gc.style.cursor = 'crosshair';
   updateUndoBtns();
 }
 
@@ -191,22 +221,35 @@ function onTouchStart(e){
   e.preventDefault();
   var touches=e.touches;
 
-  if(touches.length===2){
+  // ─ 2本指：ピンチ開始 ─
+  if(touches.length >= 2){
     cancelLongPress();
-    isPointerDown=false;
-    var d=ptDist(touches[0],touches[1]);
-    var mid=ptMid(touches[0],touches[1]);
-    var rect=gc.getBoundingClientRect();
-    pinchMidX=mid.x-rect.left; pinchMidY=mid.y-rect.top;
-    pinch0=d; pPanX0=panX; pPanY0=panY;
-    isPinching=true; isTfPan=true;
-    tf0X=mid.x; tf0Y=mid.y; tfPX0=panX; tfPY0=panY;
+    // 描画中だった場合はキャンセル（undo対象にしない）
+    isPointerDown      = false;
+    touchDrawStarted   = false;
+    stampedSet         = new Set();
+
+    var rect  = gc.getBoundingClientRect();
+    var d     = ptDist(touches[0], touches[1]);
+    var mid   = ptMid(touches[0], touches[1]);
+
+    isPinching   = true;
+    pinch0       = d;
+    pinchZoom0   = zoom;
+    pinchPanX0   = panX;
+    pinchPanY0   = panY;
+    pinchMid0X   = mid.x - rect.left;
+    pinchMid0Y   = mid.y - rect.top;
     return;
   }
 
-  isPinching=false; isTfPan=false;
-  var t0=touches[0];
-  var cell=ptToCell(t0);
+  // ─ 1本指 ─
+  isPinching = false;
+  var t0 = touches[0];
+  touchStartX = t0.clientX;
+  touchStartY = t0.clientY;
+
+  var cell = ptToCell(t0);
   hoverC=cell.c; hoverR=cell.r;
   scheduleRender();
 
@@ -221,52 +264,109 @@ function onTouchStart(e){
       openCtxMenu(lpC,lpR,t0.clientX,t0.clientY);
     }
     longPressTimer=null;
-  },480);
+  }, 480);
 
-  isPointerDown=true;
-  stampStartC=cell.c; stampStartR=cell.r;
-  stampedSet=new Set();
-  handleDraw(cell.c,cell.r);
+  isPointerDown    = true;
+  touchDrawStarted = false;   // まだ描画しない
+  stampedSet       = new Set();
+  stampStartC      = cell.c;
+  stampStartR      = cell.r;
+  // ★ここでは handleDraw を呼ばない
 }
 
 function onTouchMove(e){
   e.preventDefault();
   var touches=e.touches;
 
-  if(touches.length===2 && isPinching){
-    var d=ptDist(touches[0],touches[1]);
-    var mid=ptMid(touches[0],touches[1]);
-    var rect=gc.getBoundingClientRect();
-    var mx=mid.x-rect.left, my=mid.y-rect.top;
-    zoomAround(pinchMidX,pinchMidY, d/pinch0);
-    pinch0=d;
-    panX=tfPX0+(mid.x-tf0X);
-    panY=tfPY0+(mid.y-tf0Y);
-    tf0X=mid.x; tf0Y=mid.y; tfPX0=panX; tfPY0=panY;
+  // ─ 2本指ピンチ ─
+  if(touches.length >= 2 && isPinching){
+    var rect  = gc.getBoundingClientRect();
+    var d     = ptDist(touches[0], touches[1]);
+    var mid   = ptMid(touches[0], touches[1]);
+    var midX  = mid.x - rect.left;
+    var midY  = mid.y - rect.top;
+
+    // 非増分方式：開始時の状態から一発計算（ズレなし）
+    var rawScale = d / pinch0;
+    // 感度を抑える：べき乗でダンプ
+    var scale    = Math.pow(rawScale, 0.75);
+    var newZoom  = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, pinchZoom0 * scale));
+
+    // 開始時の指中点が現在の指中点に来るように pan を計算
+    var zr = newZoom / pinchZoom0;
+    panX = midX - (pinchMid0X - pinchPanX0) * zr;
+    panY = midY - (pinchMid0Y - pinchPanY0) * zr;
+    zoom = newZoom;
+
     scheduleRender();
     return;
   }
 
   cancelLongPress();
-  if(!isPointerDown || touches.length!==1) return;
-  var cell=ptToCell(touches[0]);
+  if(!isPointerDown || touches.length !== 1) return;
+
+  var t0  = touches[0];
+  var dx  = t0.clientX - touchStartX;
+  var dy  = t0.clientY - touchStartY;
+  var dist= Math.sqrt(dx*dx+dy*dy);
+
+  var cell=ptToCell(t0);
   hoverC=cell.c; hoverR=cell.r;
-  handleDraw(cell.c,cell.r);
+
+  // 閾値未満はまだ描画しない
+  if(!touchDrawStarted && dist < DRAW_THRESHOLD){
+    scheduleRender();
+    return;
+  }
+
+  touchDrawStarted = true;
+  handleDraw(cell.c, cell.r);
 }
 
 function onTouchEnd(e){
   e.preventDefault();
-  isPinching=false; isTfPan=false;
+
+  // ピンチ終了（片方の指を離した）
+  if(isPinching){
+    if(e.touches.length < 2){
+      isPinching       = false;
+      isPointerDown    = false;
+      touchDrawStarted = false;
+      hoverC=-1; hoverR=-1;
+      scheduleRender();
+    }
+    return;
+  }
+
   cancelLongPress();
-  if(isPointerDown){ commitStamp(); }
-  isPointerDown=false;
+
+  if(isPointerDown){
+    if(!touchDrawStarted){
+      // タップ：その場に1個設置
+      handleDraw(stampStartC, stampStartR);
+    }
+    commitStamp();
+  }
+
+  isPointerDown    = false;
+  touchDrawStarted = false;
   hoverC=-1; hoverR=-1;
   scheduleRender();
 }
 
 // ── Mouse handlers ────────────────────────────────────────────────
 function onMouseDown(e){
+  // 中クリック or パンモード → パン開始
+  if(e.button===1 || (e.button===0 && isPanMode)){
+    e.preventDefault();
+    isPanning  = true;
+    panStartX  = e.clientX; panStartY  = e.clientY;
+    panStartPX = panX;      panStartPY = panY;
+    if(gc) gc.style.cursor = 'grabbing';
+    return;
+  }
   if(e.button!==0) return;
+
   var cell=screenToCell(e.offsetX,e.offsetY);
   if(tool==='fill'){ pushUndo(); floodFill(cell.c,cell.r); return; }
   isPointerDown=true;
@@ -276,6 +376,15 @@ function onMouseDown(e){
 }
 
 function onMouseMove(e){
+  // パン中
+  if(isPanning){
+    // 感度を少し抑える（0.88倍）
+    panX = panStartPX + (e.clientX - panStartX) * 0.88;
+    panY = panStartPY + (e.clientY - panStartY) * 0.88;
+    scheduleRender();
+    return;
+  }
+
   var cell=screenToCell(e.offsetX,e.offsetY);
   hoverC=cell.c; hoverR=cell.r;
   if(isPointerDown) handleDraw(cell.c,cell.r);
@@ -283,15 +392,29 @@ function onMouseMove(e){
 }
 
 function onMouseUp(e){
+  if(isPanning){
+    isPanning=false;
+    gc.style.cursor = isPanMode ? 'grab' : 'crosshair';
+    return;
+  }
   if(isPointerDown){ commitStamp(); }
   isPointerDown=false;
+}
+
+function onMouseLeave(e){
+  if(isPanning){ isPanning=false; gc.style.cursor = isPanMode ? 'grab' : 'crosshair'; }
+  if(isPointerDown){ commitStamp(); }
+  isPointerDown=false;
+  hoverC=-1; hoverR=-1;
+  scheduleRender();
 }
 
 function onWheel(e){
   e.preventDefault();
   var rect=gc.getBoundingClientRect();
-  var f=e.deltaY<0?1.12:0.89;
-  zoomAround(e.clientX-rect.left,e.clientY-rect.top,f);
+  // 感度を下げる（1.12→1.08 / 0.89→0.93）
+  var f = e.deltaY < 0 ? 1.08 : 0.93;
+  zoomAround(e.clientX-rect.left, e.clientY-rect.top, f);
   scheduleRender();
 }
 
