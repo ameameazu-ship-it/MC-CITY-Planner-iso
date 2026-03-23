@@ -14,7 +14,7 @@ var gc, ov, gctx, octx, cw, ch;
 
 // ── Block placement animation ────────────────────────────────────
 var blockAnims   = {};   // ck(c,r) -> startTime(ms)
-var ANIM_DURATION = 320; // ms
+var ANIM_DURATION = 480; // ms
 
 function triggerBlockAnim(c, r){
   blockAnims[ck(c,r)] = performance.now();
@@ -22,19 +22,19 @@ function triggerBlockAnim(c, r){
   scheduleRender();
 }
 
-// t=0→1 の pop スケール曲線
-// 0→1.41（前半）→ 1.0（後半）でスプリング感
+// t=0→1 の pop スケール曲線（重め・ずっしり感）
+// 0 → 1.28（前半・ゆっくり膨らむ）→ 1.0（後半・ゆっくり収束）
 function _popScale(t){
   if(t <= 0)   return 0;
   if(t >= 1)   return 1;
-  if(t < 0.45){
-    // 加速しながら 0 → 1.41
-    var u = t / 0.45;
-    return 1.41 * u * u;
+  if(t < 0.5){
+    // easeInQuad: ゆっくり始まってふわっと膨らむ
+    var u = t / 0.5;
+    return 1.28 * u * u;
   } else {
-    // 1.41 → 1.0 にバウンス
-    var u = (t - 0.45) / 0.55;
-    return 1.41 - 0.41 * (3*u*u - 2*u*u*u); // smoothstep で収束
+    // easeOutCubic: 1.28 → 1.0 にゆっくり重く収束
+    var u = (t - 0.5) / 0.5;
+    return 1.28 - 0.28 * (1 - Math.pow(1 - u, 3));
   }
 }
 
