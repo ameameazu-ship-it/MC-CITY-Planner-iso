@@ -57,11 +57,9 @@ function placeCell(c,r){
   var k=ck(c,r), rid=resolveId(selectedId);
   if(cells[k]&&cells[k].id===rid) return;
   cells[k]={id:rid,dir:'none'};
-  // gesture内（touchend/mouseup）で直接再生
-  playPlaceSound();
-  // ポップアニメーション発火
   triggerBlockAnim(c,r);
   scheduleRender();
+  return true; // 実際に置けた
 }
 function eraseCell(c,r){
   if(!inGrid(c,r)) return;
@@ -85,49 +83,36 @@ function floodFill(c,r){
   scheduleRender();
 }
 
-// ── Sound ─────────────────────────────────────────────────────────
-var _audioCtx    = null;
-var _audioReady  = false;  // resume済みフラグ
+// ── Sound & Vibrate ──────────────────────────────────────────────
+// gesture ハンドラ（onTouchEnd / onWindowMouseUp）から直接呼ぶ方式
+// placeCell 等の内部関数からは呼ばない
+var _audioCtx = null;
+var _didPlace = false;  // このgesture内でブロックを置いたか
 
-// touchstart（最初のタッチ）で AudioContext を作成・resume
-// → この時点は確実に user gesture 内なので iOS でも動く
-function _initAudioOnGesture(){
-  if(_audioCtx) return;
-  try{
-    _audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-    // 作成直後に resume（iOS は autoplay policy で suspended になるため）
-    _audioCtx.resume().then(function(){ _audioReady=true; }).catch(function(){});
-  }catch(e){}
-}
-
-// touchstart と mousedown で確実に初期化
-document.addEventListener('touchstart', _initAudioOnGesture, {passive:true, once:false});
-document.addEventListener('mousedown',  _initAudioOnGesture, {passive:true, once:false});
-
-function _doPlaySound(){
-  if(!_audioCtx) return;
+function _playSound(){
   if(!soundOn) return;
+  // AudioContext がなければ作成（gesture内なので iOS でも動く）
+  if(!_audioCtx){
+    try{ _audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; }
+  }
   try{
-    var ctx = _audioCtx;
-    // suspended なら同期的に resume してそのまま続行（Promiseを待たない）
-    if(ctx.state === 'suspended') ctx.resume();
-    var osc = ctx.createOscillator();
-    var g   = ctx.createGain();
-    osc.connect(g); g.connect(ctx.destination);
+    if(_audioCtx.state === 'suspended') _audioCtx.resume();
+    var osc = _audioCtx.createOscillator();
+    var g   = _audioCtx.createGain();
+    osc.connect(g); g.connect(_audioCtx.destination);
     osc.frequency.value = 500 + Math.random()*200;
-    g.gain.setValueAtTime(0.10, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.15);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime+0.15);
+    g.gain.setValueAtTime(0.10, _audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.15);
+    osc.start(_audioCtx.currentTime);
+    osc.stop(_audioCtx.currentTime + 0.15);
   }catch(e){}
 }
 
-// placeCell から呼ぶ（gesture内で直接再生）
-function playPlaceSound(){
-  _doPlaySound();
+function _playAndVibe(){
+  _playSound();
+  if(vibeOn && navigator.vibrate) navigator.vibrate(18);
 }
 
-// ── Vibrate ───────────────────────────────────────────────────────
 function vibrateShort(){ if(vibeOn&&navigator.vibrate) navigator.vibrate(18); }
 function vibrateLong(){  if(vibeOn&&navigator.vibrate) navigator.vibrate(30); }
 
@@ -223,7 +208,7 @@ function onTouchStart(e){
     stampLPTimer=setTimeout(function(){
       stampMode=true;
       if(vibeOn&&navigator.vibrate) navigator.vibrate([30,60,30]);
-      _tryInitAudio(); if(soundOn) _doPlaySound();
+      _playAndVibe();
       stampLPTimer=null;
     }, STAMP_LONG_MS);
   }
@@ -246,25 +231,27 @@ function onTouchMove(e){
   hoverC=cell.c; hoverR=cell.r;
   if(!touchDrawStarted&&Math.sqrt(dx*dx+dy*dy)<DRAW_THRESHOLD){ scheduleRender(); return; }
   touchDrawStarted=true;
-  if(stampMode){
-    // 連続配置モード：毎フレーム置ける（stampedSet を無効化）
-    stampedSet = new Set();
-    vibrateShort();
-  }
+  if(stampMode) stampedSet = new Set();
+  _didPlace = false;
   handleDraw(cell.c,cell.r);
+  if(_didPlace) _playAndVibe();
+  _didPlace = false;
 }
 function onTouchEnd(e){
   e.preventDefault();
   if(isPinching){ if(e.touches.length<2){ isPinching=false; isPointerDown=false; touchDrawStarted=false; hoverC=-1; hoverR=-1; scheduleRender(); } return; }
   cancelLongPress();
   if(stampLPTimer){ clearTimeout(stampLPTimer); stampLPTimer=null; }
+  _didPlace = false;
   if(isPointerDown){
     if(!touchDrawStarted&&!stampMode){
-      vibrateShort();
       handleDraw(stampStartC,stampStartR);
     }
     commitStamp();
   }
+  // ここは確実に touchend（gesture）内 → 音・バイブを鳴らす
+  if(_didPlace) _playAndVibe();
+  _didPlace = false;
   isPointerDown=false; touchDrawStarted=false; stampMode=false; hoverC=-1; hoverR=-1; scheduleRender();
 }
 
@@ -296,7 +283,7 @@ function onMouseDown(e){
     stampLPTimer = setTimeout(function(){
       stampMode = true;
       if(vibeOn && navigator.vibrate) navigator.vibrate([30,60,30]);
-      _tryInitAudio(); if(soundOn) _doPlaySound();
+      _playAndVibe();
       stampLPTimer = null;
     }, STAMP_LONG_MS);
   }
@@ -325,8 +312,11 @@ function onWindowMouseMove(e){
   var cell=clientToCell(e.clientX,e.clientY);
   hoverC=cell.c; hoverR=cell.r;
   if(isPointerDown){
-    if(stampMode) stampedSet = new Set(); // 連続配置モード：都度リセット
+    if(stampMode) stampedSet = new Set();
+    _didPlace = false;
     handleDraw(cell.c,cell.r);
+    if(_didPlace) _playAndVibe();
+    _didPlace = false;
   }
   scheduleRender();
 }
@@ -339,7 +329,11 @@ function onWindowMouseUp(e){
     updateCursor();
     return;
   }
+  _didPlace = false;
   if(isPointerDown){ commitStamp(); }
+  // mouseup も gesture → 音・バイブ
+  if(_didPlace) _playAndVibe();
+  _didPlace = false;
   isPointerDown=false;
 }
 
@@ -354,17 +348,14 @@ function onWheel(e){
 function handleDraw(c,r){
   if(!inGrid(c,r)) return;
   var k=ck(c,r);
-  // スタンプモードOFF の draw ツール：最初の1マスのみ（ドラッグ連続置き不可）
   if(tool==='draw' && !stampMode && stampedSet.size >= 1) return;
   if(stampedSet.has(k)) return;
   stampedSet.add(k);
-  // pushUndo はセッション全体で1回だけ
-  if(!undoPushed){
-    pushUndo();
-    undoPushed = true;
-  }
-  if(tool==='draw')  placeCell(c,r);
-  else if(tool==='erase') eraseCell(c,r);
+  if(!undoPushed){ pushUndo(); undoPushed=true; }
+  var placed = false;
+  if(tool==='draw')        placed = placeCell(c,r);
+  else if(tool==='erase'){ eraseCell(c,r); placed=true; }
+  if(placed) _didPlace = true;  // gesture側で音・バイブを鳴らすためのフラグ
   lastC=c; lastR=r;
 }
 function commitStamp(){ stampedSet=new Set(); undoPushed=false; }
