@@ -7,6 +7,11 @@ var stampedSet       = new Set();
 var stampStartC=-1,  stampStartR=-1;
 var longPressTimer   = null, lpC=-1, lpR=-1;
 
+// ── Stamp mode（長押しで連続配置ON）─────────────────────────────
+var stampMode        = false;   // 長押しで解放された連続配置モード
+var STAMP_LONG_MS    = 550;     // 長押し判定 ms（コンテキストより少し短め）
+var stampLPTimer     = null;    // スタンプ用長押しタイマー
+
 // ── Pinch ─────────────────────────────────────────────────────────
 var isPinching = false;
 var pinch0=0, pinchZoom0=1, pinchPanX0=0, pinchPanY0=0;
@@ -51,7 +56,15 @@ function placeCell(c,r){
   var k=ck(c,r), rid=resolveId(selectedId);
   if(cells[k]&&cells[k].id===rid) return;
   cells[k]={id:rid,dir:'none'};
-  if(soundOn) playPlaceSound();
+  if(soundOn){
+    if(stampMode){
+      // 連続配置：即時再生（pendingを使わず直接鳴らす）
+      _tryInitAudio();
+      _doPlaySound();
+    } else {
+      playPlaceSound();
+    }
+  }
   // ポップアニメーション発火
   triggerBlockAnim(c,r);
   scheduleRender();
@@ -185,6 +198,17 @@ function onTouchStart(e){
   },480);
   isPointerDown=true; touchDrawStarted=false; stampedSet=new Set();
   stampStartC=cell.c; stampStartR=cell.r;
+
+  // スタンプモード長押し判定（描画ツールのみ）
+  if(tool==='draw'){
+    stampMode=false;
+    stampLPTimer=setTimeout(function(){
+      stampMode=true;
+      if(vibeOn&&navigator.vibrate) navigator.vibrate([30,60,30]);
+      _tryInitAudio(); if(soundOn) _doPlaySound();
+      stampLPTimer=null;
+    }, STAMP_LONG_MS);
+  }
 }
 function onTouchMove(e){
   e.preventDefault();
@@ -192,7 +216,7 @@ function onTouchMove(e){
   if(ts.length>=2&&isPinching){
     var rect=gc.getBoundingClientRect(), d=ptDist(ts[0],ts[1]), mid=ptMid(ts[0],ts[1]);
     var midX=mid.x-rect.left, midY=mid.y-rect.top;
-    var newZoom=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,pinchZoom0*Math.pow(d/pinch0,0.75)));
+    var newZoom=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,pinchZoom0*Math.pow(d/pinch0,0.50)));
     var zr=newZoom/pinchZoom0;
     panX=midX-(pinchMid0X-pinchPanX0)*zr; panY=midY-(pinchMid0Y-pinchPanY0)*zr; zoom=newZoom;
     scheduleRender(); return;
@@ -203,14 +227,23 @@ function onTouchMove(e){
   var cell=clientToCell(t0.clientX,t0.clientY);
   hoverC=cell.c; hoverR=cell.r;
   if(!touchDrawStarted&&Math.sqrt(dx*dx+dy*dy)<DRAW_THRESHOLD){ scheduleRender(); return; }
-  touchDrawStarted=true; handleDraw(cell.c,cell.r);
+  touchDrawStarted=true;
+  if(stampMode){
+    // 連続配置モード：毎フレーム置ける（stampedSet を無効化）
+    stampedSet = new Set();
+  }
+  handleDraw(cell.c,cell.r);
 }
 function onTouchEnd(e){
   e.preventDefault();
   if(isPinching){ if(e.touches.length<2){ isPinching=false; isPointerDown=false; touchDrawStarted=false; hoverC=-1; hoverR=-1; scheduleRender(); } return; }
   cancelLongPress();
-  if(isPointerDown){ if(!touchDrawStarted) handleDraw(stampStartC,stampStartR); commitStamp(); }
-  isPointerDown=false; touchDrawStarted=false; hoverC=-1; hoverR=-1; scheduleRender();
+  if(stampLPTimer){ clearTimeout(stampLPTimer); stampLPTimer=null; }
+  if(isPointerDown){
+    if(!touchDrawStarted&&!stampMode) handleDraw(stampStartC,stampStartR);
+    commitStamp();
+  }
+  isPointerDown=false; touchDrawStarted=false; stampMode=false; hoverC=-1; hoverR=-1; scheduleRender();
 }
 
 // ── Mouse ────────────────────────────────────────────────────────
@@ -232,15 +265,27 @@ function onMouseDown(e){
   var cell=clientToCell(e.clientX,e.clientY);
   if(tool==='fill'){ pushUndo(); floodFill(cell.c,cell.r); return; }
   isPointerDown=true; stampStartC=cell.c; stampStartR=cell.r;
-  stampedSet=new Set(); handleDraw(cell.c,cell.r);
+  stampedSet=new Set();
+  // 最初の1個を置く
+  handleDraw(cell.c,cell.r);
+  // スタンプモード長押し判定
+  if(tool==='draw'){
+    stampMode = false;
+    stampLPTimer = setTimeout(function(){
+      stampMode = true;
+      if(vibeOn && navigator.vibrate) navigator.vibrate([30,60,30]);
+      _tryInitAudio(); if(soundOn) _doPlaySound();
+      stampLPTimer = null;
+    }, STAMP_LONG_MS);
+  }
 }
 
 function onWindowMouseMove(e){
   if(isPanning){
     var dx = e.clientX - _lastMouseX;
     var dy = e.clientY - _lastMouseY;
-    panX += dx;
-    panY += dy;
+    panX += dx * 0.55;
+    panY += dy * 0.55;
     _lastMouseX = e.clientX;
     _lastMouseY = e.clientY;
     render();   // 直接呼び出しで確実に再描画
@@ -257,11 +302,16 @@ function onWindowMouseMove(e){
   }
   var cell=clientToCell(e.clientX,e.clientY);
   hoverC=cell.c; hoverR=cell.r;
-  if(isPointerDown) handleDraw(cell.c,cell.r);
+  if(isPointerDown){
+    if(stampMode) stampedSet = new Set(); // 連続配置モード：都度リセット
+    handleDraw(cell.c,cell.r);
+  }
   scheduleRender();
 }
 
 function onWindowMouseUp(e){
+  if(stampLPTimer){ clearTimeout(stampLPTimer); stampLPTimer=null; }
+  stampMode=false;
   if(isPanning){
     isPanning=false;
     updateCursor();
@@ -274,14 +324,17 @@ function onWindowMouseUp(e){
 function onWheel(e){
   e.preventDefault();
   var rect=gc.getBoundingClientRect();
-  zoomAround(e.clientX-rect.left, e.clientY-rect.top, e.deltaY<0?1.08:0.93);
+  zoomAround(e.clientX-rect.left, e.clientY-rect.top, e.deltaY<0?1.05:0.96);
   scheduleRender();
 }
 
 // ── Draw logic ────────────────────────────────────────────────────
 function handleDraw(c,r){
   if(!inGrid(c,r)) return;
-  var k=ck(c,r); if(stampedSet.has(k)) return;
+  var k=ck(c,r);
+  // スタンプモードOFF の draw ツール：最初の1マスのみ（ドラッグ連続置き不可）
+  if(tool==='draw' && !stampMode && stampedSet.size >= 1) return;
+  if(stampedSet.has(k)) return;
   stampedSet.add(k);
   if(tool==='draw'){ if(stampedSet.size===1) pushUndo(); placeCell(c,r); }
   else if(tool==='erase'){ if(stampedSet.size===1) pushUndo(); eraseCell(c,r); }
