@@ -166,6 +166,33 @@ function setTool(t2){
   });
 }
 
+// ── Pan helpers（document へ動的登録）────────────────────────────
+function _onPanMove(e){
+  panX = panStartPX + (e.clientX - panStartX) * 0.88;
+  panY = panStartPY + (e.clientY - panStartY) * 0.88;
+  scheduleRender();
+}
+function _onPanUp(e){
+  stopPan();
+}
+function startPan(e){
+  isPanning  = true;
+  panStartX  = e.clientX;
+  panStartY  = e.clientY;
+  panStartPX = panX;
+  panStartPY = panY;
+  updateCursor();
+  document.addEventListener('mousemove', _onPanMove);
+  document.addEventListener('mouseup',   _onPanUp);
+}
+function stopPan(){
+  if(!isPanning) return;
+  isPanning = false;
+  updateCursor();
+  document.removeEventListener('mousemove', _onPanMove);
+  document.removeEventListener('mouseup',   _onPanUp);
+}
+
 // ── Pan mode toggle（btn-center 転用）────────────────────────────
 function togglePanMode(){
   isPanMode = !isPanMode;
@@ -191,12 +218,12 @@ function initInteraction(){
   wrap.addEventListener('touchend',   onTouchEnd,   {passive:false});
   wrap.addEventListener('touchcancel',onTouchEnd,   {passive:false});
 
-  // マウス（PC）── wrap に貼ることで canvas 外でも確実に動作
+  // マウス（PC）
   wrap.addEventListener('mousedown',  onMouseDown);
-  wrap.addEventListener('mousemove',  onMouseMove);
-  wrap.addEventListener('mouseup',    onMouseUp);
-  wrap.addEventListener('mouseleave', onMouseLeave);
+  wrap.addEventListener('mousemove',  onMouseMove);  // hover・描画用
+  wrap.addEventListener('mouseleave', onMouseLeave); // hover解除用
   wrap.addEventListener('wheel',      onWheel, {passive:false});
+  // ※ パン中の mousemove/mouseup は動的に document へ登録（下記 startPan/stopPan）
 
   // ツールバー
   document.getElementById('btn-undo').addEventListener('click', undo);
@@ -347,14 +374,7 @@ function onMouseDown(e){
   // 左クリック＋パンモード、または中クリック → パン開始
   if(e.button===1 || (e.button===0 && isPanMode)){
     e.preventDefault();
-    isPanning  = true;
-    panStartX  = e.clientX;
-    panStartY  = e.clientY;
-    panStartPX = panX;
-    panStartPY = panY;
-    updateCursor();
-    // ポインターキャプチャ：wrap外に出ても mousemove/mouseup を受け取る
-    try{ e.target.setPointerCapture && e.target.setPointerCapture(e.pointerId); }catch(ex){}
+    startPan(e);
     return;
   }
   if(e.button !== 0) return;
@@ -368,12 +388,8 @@ function onMouseDown(e){
 }
 
 function onMouseMove(e){
-  if(isPanning){
-    panX = panStartPX + (e.clientX - panStartX) * 0.88;
-    panY = panStartPY + (e.clientY - panStartY) * 0.88;
-    scheduleRender();
-    return;
-  }
+  // hover・描画のみ（パンは _onPanMove が document レベルで処理）
+  if(isPanning) return;
   var cell = clientToCell(e.clientX, e.clientY);
   hoverC=cell.c; hoverR=cell.r;
   if(isPointerDown) handleDraw(cell.c, cell.r);
@@ -381,11 +397,7 @@ function onMouseMove(e){
 }
 
 function onMouseUp(e){
-  if(isPanning){
-    isPanning = false;
-    updateCursor();
-    return;
-  }
+  // パンは _onPanUp が処理するのでここでは描画終了のみ
   if(isPointerDown){ commitStamp(); }
   isPointerDown = false;
 }
