@@ -11,7 +11,7 @@ var soundOn = true, vibeOn = true;
 var I18N = {
   ja:{
     draw:'描く', erase:'消す', fill:'塗り', list:'一覧',
-    undo:'戻す', redo:'進む', center:'⌖中心', settings:'設定',
+    undo:'戻す', redo:'進む', center:'✋移動', settings:'設定',
     save:'💾 保存', clear:'🗑 マップをクリア', close:'閉じる',
     confirm_clear:'マップをクリアしますか？',
     confirm_load:' を読み込みますか？現在の作業は消えます。',
@@ -30,7 +30,7 @@ var I18N = {
   },
   en:{
     draw:'Draw', erase:'Erase', fill:'Fill', list:'List',
-    undo:'Undo', redo:'Redo', center:'⌖Ctr', settings:'Settings',
+    undo:'Undo', redo:'Redo', center:'✋Pan', settings:'Settings',
     save:'💾 Save', clear:'🗑 Clear Map', close:'Close',
     confirm_clear:'Clear the map?',
     confirm_load:' — load this map? Current work will be lost.',
@@ -49,7 +49,7 @@ var I18N = {
   },
   zh:{
     draw:'绘制', erase:'删除', fill:'填充', list:'列表',
-    undo:'撤销', redo:'重做', center:'⌖中心', settings:'设置',
+    undo:'撤销', redo:'重做', center:'✋移动', settings:'设置',
     save:'💾 保存', clear:'🗑 清除地图', close:'关闭',
     confirm_clear:'清除地图？',
     confirm_load:' — 加载此地图？当前内容将丢失。',
@@ -68,7 +68,7 @@ var I18N = {
   },
   ko:{
     draw:'그리기', erase:'지우기', fill:'채우기', list:'목록',
-    undo:'되돌리기', redo:'다시하기', center:'⌖중심', settings:'설정',
+    undo:'되돌리기', redo:'다시하기', center:'✋이동', settings:'설정',
     save:'💾 저장', clear:'🗑 맵 지우기', close:'닫기',
     confirm_clear:'맵을 지울까요?',
     confirm_load:' — 이 맵을 불러올까요? 현재 작업이 사라집니다.',
@@ -87,7 +87,7 @@ var I18N = {
   },
   es:{
     draw:'Dibujar', erase:'Borrar', fill:'Rellenar', list:'Lista',
-    undo:'Deshacer', redo:'Rehacer', center:'⌖Centro', settings:'Ajustes',
+    undo:'Deshacer', redo:'Rehacer', center:'✋Mover', settings:'Ajustes',
     save:'💾 Guardar', clear:'🗑 Limpiar mapa', close:'Cerrar',
     confirm_clear:'¿Limpiar el mapa?',
     confirm_load:' — ¿Cargar este mapa? Se perderá el trabajo actual.',
@@ -106,7 +106,7 @@ var I18N = {
   },
   fr:{
     draw:'Dessiner', erase:'Effacer', fill:'Remplir', list:'Liste',
-    undo:'Annuler', redo:'Refaire', center:'⌖Centre', settings:'Réglages',
+    undo:'Annuler', redo:'Refaire', center:'✋Dépl.', settings:'Réglages',
     save:'💾 Enregistrer', clear:'🗑 Effacer la carte', close:'Fermer',
     confirm_clear:'Effacer la carte ?',
     confirm_load:' — Charger cette carte ? Le travail actuel sera perdu.',
@@ -125,7 +125,7 @@ var I18N = {
   },
   id:{
     draw:'Gambar', erase:'Hapus', fill:'Isi', list:'Daftar',
-    undo:'Batal', redo:'Ulang', center:'⌖Pusat', settings:'Pengaturan',
+    undo:'Batal', redo:'Ulang', center:'✋Geser', settings:'Pengaturan',
     save:'💾 Simpan', clear:'🗑 Hapus Peta', close:'Tutup',
     confirm_clear:'Hapus peta?',
     confirm_load:' — Muat peta ini? Pekerjaan saat ini akan hilang.',
@@ -144,7 +144,7 @@ var I18N = {
   },
   hi:{
     draw:'बनाएं', erase:'मिटाएं', fill:'भरें', list:'सूची',
-    undo:'वापस', redo:'आगे', center:'⌖केंद्र', settings:'सेटिंग',
+    undo:'वापस', redo:'आगे', center:'✋पैन', settings:'सेटिंग',
     save:'💾 सहेजें', clear:'🗑 मानचित्र साफ़ करें', close:'बंद करें',
     confirm_clear:'मानचित्र साफ़ करें?',
     confirm_load:' — यह मानचित्र लोड करें? वर्तमान कार्य खो जाएगा।',
