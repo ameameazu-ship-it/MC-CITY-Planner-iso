@@ -138,13 +138,12 @@ function initInteraction(){
   wrap.addEventListener('touchend',  onTouchEnd,  {passive:false});
   wrap.addEventListener('touchcancel',onTouchEnd, {passive:false});
 
-  // マウス（canvas-wrap に登録）
-  wrap.addEventListener('mousedown', onMouseDown);
-  wrap.addEventListener('wheel',     onWheel, {passive:false});
-
-  // mousemove / mouseup は window に登録（要素の外でも確実に追跡）
+  // マウス：全て window に登録（要素を問わず確実に動作）
+  window.addEventListener('mousedown', onWindowMouseDown);
   window.addEventListener('mousemove', onWindowMouseMove);
   window.addEventListener('mouseup',   onWindowMouseUp);
+  // wheel は wrap（スクロール防止のため）
+  wrap.addEventListener('wheel', onWheel, {passive:false});
 
   // ツールバー
   document.getElementById('btn-undo').addEventListener('click',undo);
@@ -212,17 +211,31 @@ function onTouchEnd(e){
   isPointerDown=false; touchDrawStarted=false; hoverC=-1; hoverR=-1; scheduleRender();
 }
 
-// ── Mouse ─────────────────────────────────────────────────────────
-function onMouseDown(e){
-  // パンモード or 中クリック
-  if(e.button===1||(e.button===0&&isPanMode)){
+// ── Mouse（全て window レベル）────────────────────────────────────
+function _isOnCanvas(e){
+  // クリック位置が canvas-wrap 内かどうか
+  var wrap=document.getElementById('canvas-wrap');
+  return wrap && wrap.contains(e.target);
+}
+
+function onWindowMouseDown(e){
+  if(e.button!==0 && e.button!==1) return;
+
+  // パンモード or 中クリック（canvas上のみ）
+  if(e.button===1 || (e.button===0 && isPanMode)){
+    if(!_isOnCanvas(e)) return;
     e.preventDefault();
-    isPanning=true;
-    panStartX=e.clientX; panStartY=e.clientY;
-    panStartPX=panX; panStartPY=panY;
+    isPanning  = true;
+    panStartX  = e.clientX;
+    panStartY  = e.clientY;
+    panStartPX = panX;
+    panStartPY = panY;
     updateCursor();
     return;
   }
+
+  // 描画モード（canvas上のみ）
+  if(!_isOnCanvas(e)) return;
   if(e.button!==0) return;
   var cell=clientToCell(e.clientX,e.clientY);
   if(tool==='fill'){ pushUndo(); floodFill(cell.c,cell.r); return; }
@@ -230,17 +243,20 @@ function onMouseDown(e){
   stampedSet=new Set(); handleDraw(cell.c,cell.r);
 }
 
-// window レベルのイベント：要素外でも確実に動作
 function onWindowMouseMove(e){
   if(isPanning){
-    panX=panStartPX+(e.clientX-panStartX)*0.88;
-    panY=panStartPY+(e.clientY-panStartY)*0.88;
+    panX = panStartPX + (e.clientX - panStartX) * 0.88;
+    panY = panStartPY + (e.clientY - panStartY) * 0.88;
+    // scheduleRenderではなくrender()直呼び（確実に再描画）
+    dirty = false;
     scheduleRender();
     return;
   }
-  // canvas内にある場合のみhover・描画
+  // canvas外ならhover解除
   var rect=gc.getBoundingClientRect();
-  if(e.clientX<rect.left||e.clientX>rect.right||e.clientY<rect.top||e.clientY>rect.bottom){
+  var inside = e.clientX>=rect.left && e.clientX<=rect.right &&
+               e.clientY>=rect.top  && e.clientY<=rect.bottom;
+  if(!inside){
     if(hoverC>=0){ hoverC=-1; hoverR=-1; scheduleRender(); }
     if(isPointerDown){ commitStamp(); isPointerDown=false; }
     return;
