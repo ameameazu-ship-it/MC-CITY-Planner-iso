@@ -52,6 +52,8 @@ function placeCell(c,r){
   if(cells[k]&&cells[k].id===rid) return;
   cells[k]={id:rid,dir:'none'};
   if(soundOn) playPlaceSound();
+  // ポップアニメーション発火
+  triggerBlockAnim(c,r);
   scheduleRender();
 }
 function eraseCell(c,r){
