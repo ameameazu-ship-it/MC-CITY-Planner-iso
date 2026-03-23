@@ -84,33 +84,67 @@ function floodFill(c,r){
 }
 
 // ── Sound & Vibrate ──────────────────────────────────────────────
-// gesture ハンドラ（onTouchEnd / onWindowMouseUp）から直接呼ぶ方式
-// placeCell 等の内部関数からは呼ばない
-var _audioCtx = null;
-var _didPlace = false;  // このgesture内でブロックを置いたか
+var _audioCtx   = null;
+var _didPlace   = false;
+var _placeCount = 0;    // 連続配置カウント（音のピッチに使う）
 
-function _playSound(){
-  if(!soundOn) return;
-  // AudioContext がなければ作成（gesture内なので iOS でも動く）
+function _getAudioCtx(){
   if(!_audioCtx){
-    try{ _audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; }
+    try{ _audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; }
   }
+  if(_audioCtx.state === 'suspended') _audioCtx.resume();
+  return _audioCtx;
+}
+
+// 単発配置音：コツン（短く乾いた木の音）
+function _playSingleSound(){
+  if(!soundOn) return;
+  var ctx = _getAudioCtx(); if(!ctx) return;
   try{
-    if(_audioCtx.state === 'suspended') _audioCtx.resume();
-    var osc = _audioCtx.createOscillator();
-    var g   = _audioCtx.createGain();
-    osc.connect(g); g.connect(_audioCtx.destination);
-    osc.frequency.value = 500 + Math.random()*200;
-    g.gain.setValueAtTime(0.10, _audioCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, _audioCtx.currentTime + 0.15);
-    osc.start(_audioCtx.currentTime);
-    osc.stop(_audioCtx.currentTime + 0.15);
+    var t = ctx.currentTime;
+    // 低めのパーカッシブな音（木ブロックを置く感じ）
+    var osc = ctx.createOscillator();
+    var g   = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(320, t);
+    osc.frequency.exponentialRampToValueAtTime(180, t + 0.08);
+    g.gain.setValueAtTime(0.18, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(t); osc.stop(t + 0.10);
+  }catch(e){}
+}
+
+// 連続配置音：テンポよく上がっていく短い音（くどくない）
+// _placeCount に応じてピッチが少し上がる（気持ちいいスケール感）
+var _stampNotes = [261, 294, 330, 349, 392, 440, 494, 523]; // Cメジャースケール
+function _playStampSound(){
+  if(!soundOn) return;
+  var ctx = _getAudioCtx(); if(!ctx) return;
+  try{
+    var t    = ctx.currentTime;
+    var note = _stampNotes[_placeCount % _stampNotes.length];
+    var osc  = ctx.createOscillator();
+    var g    = ctx.createGain();
+    osc.type = 'triangle';  // 柔らかい音色
+    osc.frequency.setValueAtTime(note, t);
+    g.gain.setValueAtTime(0.12, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(t); osc.stop(t + 0.08);
   }catch(e){}
 }
 
 function _playAndVibe(){
-  _playSound();
-  if(vibeOn && navigator.vibrate) navigator.vibrate(18);
+  if(stampMode){
+    _playStampSound();
+    _placeCount++;
+    if(vibeOn && navigator.vibrate) navigator.vibrate(8);  // 連続は短く
+  } else {
+    _playSingleSound();
+    _placeCount = 0;  // 単発でリセット
+    if(vibeOn && navigator.vibrate) navigator.vibrate(18);
+  }
 }
 
 function vibrateShort(){ if(vibeOn&&navigator.vibrate) navigator.vibrate(18); }
@@ -252,7 +286,8 @@ function onTouchEnd(e){
   // ここは確実に touchend（gesture）内 → 音・バイブを鳴らす
   if(_didPlace) _playAndVibe();
   _didPlace = false;
-  isPointerDown=false; touchDrawStarted=false; stampMode=false; hoverC=-1; hoverR=-1; scheduleRender();
+  if(!stampMode) _placeCount=0;
+  isPointerDown=false; touchDrawStarted=false; stampMode=false; _placeCount=0; hoverC=-1; hoverR=-1; scheduleRender();
 }
 
 // ── Mouse ────────────────────────────────────────────────────────
@@ -334,6 +369,7 @@ function onWindowMouseUp(e){
   // mouseup も gesture → 音・バイブ
   if(_didPlace) _playAndVibe();
   _didPlace = false;
+  _placeCount = 0;
   isPointerDown=false;
 }
 
