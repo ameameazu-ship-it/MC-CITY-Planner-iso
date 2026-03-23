@@ -96,43 +96,72 @@ function _getAudioCtx(){
   return _audioCtx;
 }
 
-// 単発配置音：コツン（短く乾いた木の音）
-function _playSingleSound(){
+// ── マイクラ風ブロック配置音 ─────────────────────────────────────
+// ノイズ（質感）+ 低音サイン波（ドシュ感）の組み合わせ
+
+function _mcPlaceSound(pitchMult){
   if(!soundOn) return;
   var ctx = _getAudioCtx(); if(!ctx) return;
+  pitchMult = pitchMult || 1.0;
+
   try{
-    var t = ctx.currentTime;
-    // 低めのパーカッシブな音（木ブロックを置く感じ）
-    var osc = ctx.createOscillator();
-    var g   = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(320, t);
-    osc.frequency.exponentialRampToValueAtTime(180, t + 0.08);
-    g.gain.setValueAtTime(0.18, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.10);
-    osc.connect(g); g.connect(ctx.destination);
-    osc.start(t); osc.stop(t + 0.10);
+    var t   = ctx.currentTime;
+    var out = ctx.createGain();
+    out.gain.setValueAtTime(1.0, t);
+    out.connect(ctx.destination);
+
+    // ── 1. ノイズバースト（ザクッという質感）──────────────────
+    var bufSize = ctx.sampleRate * 0.06;
+    var buf     = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    var data    = buf.getChannelData(0);
+    for(var i=0; i<bufSize; i++) data[i] = (Math.random()*2-1);
+
+    var noise   = ctx.createBufferSource();
+    noise.buffer = buf;
+
+    // バンドパスフィルタ：木材っぽい帯域（400-800Hz）
+    var bp = ctx.createBiquadFilter();
+    bp.type            = 'bandpass';
+    bp.frequency.value = 600 * pitchMult;
+    bp.Q.value         = 1.2;
+
+    var noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.22, t);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.055);
+
+    noise.connect(bp);
+    bp.connect(noiseGain);
+    noiseGain.connect(out);
+    noise.start(t); noise.stop(t + 0.06);
+
+    // ── 2. 低音サイン波（ドシュというボディ感）────────────────
+    var body = ctx.createOscillator();
+    body.type = 'sine';
+    body.frequency.setValueAtTime(130 * pitchMult, t);
+    body.frequency.exponentialRampToValueAtTime(60 * pitchMult, t + 0.07);
+
+    var bodyGain = ctx.createGain();
+    bodyGain.gain.setValueAtTime(0.28, t);
+    bodyGain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+
+    body.connect(bodyGain);
+    bodyGain.connect(out);
+    body.start(t); body.stop(t + 0.07);
+
   }catch(e){}
 }
 
-// 連続配置音：テンポよく上がっていく短い音（くどくない）
-// _placeCount に応じてピッチが少し上がる（気持ちいいスケール感）
-var _stampNotes = [261, 294, 330, 349, 392, 440, 494, 523]; // Cメジャースケール
+// 単発：ランダムにわずかなピッチ揺らぎ（マイクラ風）
+function _playSingleSound(){
+  var pitch = 0.92 + Math.random() * 0.16; // 0.92〜1.08
+  _mcPlaceSound(pitch);
+}
+
+// 連続：ピッチを少しずつ変えてリズム感（8音でループ）
+var _stampPitches = [1.00, 1.05, 0.97, 1.08, 0.95, 1.03, 1.10, 0.98];
 function _playStampSound(){
-  if(!soundOn) return;
-  var ctx = _getAudioCtx(); if(!ctx) return;
-  try{
-    var t    = ctx.currentTime;
-    var note = _stampNotes[_placeCount % _stampNotes.length];
-    var osc  = ctx.createOscillator();
-    var g    = ctx.createGain();
-    osc.type = 'triangle';  // 柔らかい音色
-    osc.frequency.setValueAtTime(note, t);
-    g.gain.setValueAtTime(0.12, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
-    osc.connect(g); g.connect(ctx.destination);
-    osc.start(t); osc.stop(t + 0.08);
-  }catch(e){}
+  var pitch = _stampPitches[_placeCount % _stampPitches.length];
+  _mcPlaceSound(pitch);
 }
 
 function _playAndVibe(){
