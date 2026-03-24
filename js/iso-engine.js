@@ -13,8 +13,8 @@ var dirty = true;
 var gc, ov, gctx, octx, cw, ch;
 
 // ── Block placement animation ────────────────────────────────────
-var blockAnims   = {};   // ck(c,r) -> startTime(ms)
-var ANIM_DURATION = 480; // ms
+var blockAnims   = {};
+var ANIM_DURATION = 480;
 
 function triggerBlockAnim(c, r){
   blockAnims[ck(c,r)] = performance.now();
@@ -22,17 +22,13 @@ function triggerBlockAnim(c, r){
   scheduleRender();
 }
 
-// t=0→1 の pop スケール曲線（重め・ずっしり感）
-// 0 → 1.28（前半・ゆっくり膨らむ）→ 1.0（後半・ゆっくり収束）
 function _popScale(t){
   if(t <= 0)   return 0;
   if(t >= 1)   return 1;
   if(t < 0.5){
-    // easeInQuad: ゆっくり始まってふわっと膨らむ
     var u = t / 0.5;
     return 1.28 * u * u;
   } else {
-    // easeOutCubic: 1.28 → 1.0 にゆっくり重く収束
     var u = (t - 0.5) / 0.5;
     return 1.28 - 0.28 * (1 - Math.pow(1 - u, 3));
   }
@@ -49,35 +45,22 @@ function getBlockScale(c, r){
 // ── Background theme ─────────────────────────────────────────────
 var bgTheme = 'default';
 
-// テーマごとのカラーパレット:
-// [空top昼, 空bot昼, 地面昼, 地面夜, グリッド線, 空top夜, 空bot夜]
 var BG_THEMES = {
-  // ブラック: 星空の宇宙夜景。深い藍紫の夜空＋ほぼ黒の地面
   'default': ['#0d0d12', '#05050a', '#1a1a22', '#10101a',
               'rgba(255,255,255,0.13)',
               '#0a0a2e', '#04041a'],
-
-  // グリーン: 森の夜。深緑の夜空＋月明かりに染まる暗緑の地面
   'grass'  : ['#0e4020', '#061a08', '#2e5a30', '#0c2212',
               'rgba(255,255,255,0.12)',
               '#061428', '#030c10'],
-
-  // サンド: 砂漠の夜。暖色系の夜空＋月明かりが当たった砂色の地面
   'desert' : ['#5a3010', '#2e1808', '#8c6030', '#5a3e1a',
               'rgba(0,0,0,0.20)',
               '#180e28', '#0c0814'],
-
-  // スノー: 雪の夜景。月明かりで輝く青白い地面が映える
   'snow'   : ['#4a7aaa', '#1e3a60', '#7aaccc', '#7aaac0',
               'rgba(20,50,90,0.30)',
               '#0c1e3e', '#060e22'],
-
-  // ネイビー: 深海の夜。漆黒の海＋わずかに光る深紺の地面
   'ocean'  : ['#040e22', '#020810', '#0a3060', '#061838',
               'rgba(255,255,255,0.14)',
               '#020614', '#01030c'],
-
-  // グレー: 都市の夜景。青みがかった夜空＋薄く光る石畳の地面
   'stone'  : ['#1e1e28', '#0c0c14', '#48485a', '#28283c',
               'rgba(255,255,255,0.11)',
               '#0e0e22', '#06060e']
@@ -149,21 +132,18 @@ function clipDiamond(ctx, x, y){
 // ── Draw: isometric box ──────────────────────────────────────────
 function isoBox(ctx, x, y, bh, tc, lc, rc){
   var hw=HW*zoom, hh=HH*zoom, zb=bh*zoom;
-  // Left face (NW wall) - 下端をy+hh*2まで
   ctx.beginPath();
   ctx.moveTo(x,    y-zb);
   ctx.lineTo(x-hw, y+hh-zb);
   ctx.lineTo(x-hw, y+hh*2);
   ctx.lineTo(x,    y+hh*2);
   ctx.closePath(); ctx.fillStyle=lc; ctx.fill();
-  // Right face (NE wall) - 下端をy+hh*2まで
   ctx.beginPath();
   ctx.moveTo(x,    y-zb);
   ctx.lineTo(x+hw, y+hh-zb);
   ctx.lineTo(x+hw, y+hh*2);
   ctx.lineTo(x,    y+hh*2);
   ctx.closePath(); ctx.fillStyle=rc; ctx.fill();
-  // Top face
   ctx.beginPath();
   ctx.moveTo(x,    y-zb);
   ctx.lineTo(x+hw, y+hh-zb);
@@ -290,11 +270,10 @@ function render(){
   if(!gctx) return;
   gctx.clearRect(0,0,cw,ch);
 
-  var pal = getBgPalette(); // [空top, 空bot, 地面昼, 地面夜, グリッド]
+  var pal = getBgPalette();
 
   // Sky background
   if(nightMode){
-    // テーマ専用の夜空色を使用（pal[5], pal[6]）
     var sky=gctx.createLinearGradient(0,0,0,ch);
     sky.addColorStop(0, pal[5] || shadeC(pal[0], 0.28));
     sky.addColorStop(1, pal[6] || shadeC(pal[1], 0.22));
@@ -305,7 +284,7 @@ function render(){
     gctx.fillStyle=sky2; gctx.fillRect(0,0,cw,ch);
   }
 
-  // Build sorted tile list (painter's order: small c+r first)
+  // Build sorted tile list (painter's order)
   var tileList=[];
   for(var r2=0;r2<ROWS;r2++){
     for(var c2=0;c2<COLS;c2++){
@@ -314,18 +293,17 @@ function render(){
   }
   tileList.sort(function(a,b){ return (a[0]+a[1])-(b[0]+b[1]); });
 
-  // ── Pass 1: 全タイルの地面を先に描く ────────────────────────────
+  // ── Pass 1: 全タイルの地面 ───────────────────────────────────
   tileList.forEach(function(cr){
     var c=cr[0], r=cr[1];
     var s=cellToScreen(c,r);
     var gfill  = nightMode ? pal[3] : pal[2];
-    // 夜間グリッド: スノーは地面が明るいので暗い線、それ以外は白系
     var nightGrid = (bgTheme === 'snow') ? 'rgba(30,70,120,0.35)' : 'rgba(255,255,255,0.09)';
     var gstroke= showGrid  ? (nightMode ? nightGrid : pal[4]) : null;
     drawDiamond(gctx, s.x, s.y, gfill, gstroke, 0.5);
   });
 
-  // ── Pass 2: 全ブロックを地面の上に描く ──────────────────────────
+  // ── Pass 2: 全ブロック ───────────────────────────────────────
   tileList.forEach(function(cr){
     var c=cr[0], r=cr[1];
     var cell=getCell(c,r);
@@ -333,7 +311,6 @@ function render(){
       var s=cellToScreen(c,r);
       var scale=getBlockScale(c,r);
       if(scale!==1){
-        // タイル中心を基準にスケール変換
         var cx=s.x, cy=s.y+HH*zoom;
         gctx.save();
         gctx.translate(cx,cy);
@@ -347,6 +324,50 @@ function render(){
     }
   });
 
+  // ── Pass 3: グループ枠（同種ブロックのくっつき表示）─────────
+  // groupMap は interaction.js で定義されているグローバル変数
+  if(typeof groupMap !== 'undefined'){
+    var drawnGids = {};
+    tileList.forEach(function(cr){
+      var c=cr[0], r=cr[1];
+      var cell=getCell(c,r);
+      if(!cell||!cell.gid) return;
+      var gid=cell.gid;
+      if(drawnGids[gid]) return;
+      drawnGids[gid]=true;
+      var grp=groupMap[gid];
+      if(!grp||grp.cells.length<2) return;
+
+      // グループ内の全セルにゴールドの枠を描く
+      grp.cells.forEach(function(pos){
+        var s=cellToScreen(pos.c, pos.r);
+        drawDiamond(gctx, s.x, s.y, null, 'rgba(245,200,66,0.80)', 2.0);
+      });
+
+      // グループサイズラベル（2×2 など）
+      var bbox = groupBBox(grp.cells);
+      if(bbox.w >= 2 || bbox.h >= 2){
+        var anchorS = cellToScreen(bbox.minC, bbox.minR);
+        var hw = HW*zoom, hh = HH*zoom;
+        // ラベルをグループ上部中央に表示
+        var labelX = anchorS.x + (bbox.w - bbox.h) * hw * 0.5;
+        var labelY = anchorS.y - 4*zoom;
+        var fs = Math.max(9, Math.min(16, zoom*13));
+        gctx.save();
+        gctx.font = 'bold '+fs+'px sans-serif';
+        gctx.textAlign = 'center';
+        gctx.textBaseline = 'bottom';
+        var lbl = bbox.w+'×'+bbox.h;
+        var tw = gctx.measureText(lbl).width;
+        gctx.fillStyle = 'rgba(0,0,0,0.65)';
+        gctx.fillRect(labelX-tw/2-3, labelY-fs-2, tw+6, fs+4);
+        gctx.fillStyle = '#f5c842';
+        gctx.fillText(lbl, labelX, labelY);
+        gctx.restore();
+      }
+    });
+  }
+
   // Hover highlight
   if(hoverC>=0 && hoverR>=0 && inGrid(hoverC,hoverR)){
     var hs=cellToScreen(hoverC,hoverR);
@@ -354,7 +375,6 @@ function render(){
   }
 
   dirty=false;
-  // アニメーション中のブロックがあれば次フレームも描画
   if(Object.keys(blockAnims).length > 0){
     requestAnimationFrame(render);
   }
@@ -362,6 +382,16 @@ function render(){
 
 function scheduleRender(){
   if(!dirty){ dirty=true; requestAnimationFrame(render); }
+}
+
+// ── グループのバウンディングボックスを計算 ───────────────────────
+function groupBBox(cells2){
+  var minC=cells2[0].c, maxC=cells2[0].c, minR=cells2[0].r, maxR=cells2[0].r;
+  for(var i=1;i<cells2.length;i++){
+    if(cells2[i].c<minC) minC=cells2[i].c; if(cells2[i].c>maxC) maxC=cells2[i].c;
+    if(cells2[i].r<minR) minR=cells2[i].r; if(cells2[i].r>maxR) maxR=cells2[i].r;
+  }
+  return {minC:minC, maxC:maxC, minR:minR, maxR:maxR, w:maxC-minC+1, h:maxR-minR+1};
 }
 
 // ── dispatch to per-block draw functions ─────────────────────────
