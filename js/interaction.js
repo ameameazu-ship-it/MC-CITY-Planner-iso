@@ -8,10 +8,10 @@ var stampStartC=-1,  stampStartR=-1;
 var longPressTimer   = null, lpC=-1, lpR=-1;
 
 // ── Stamp mode（長押しで連続配置ON）─────────────────────────────
-var stampMode        = false;   // 長押しで解放された連続配置モード
-var STAMP_LONG_MS    = 550;     // 長押し判定 ms（コンテキストより少し短め）
-var stampLPTimer     = null;    // スタンプ用長押しタイマー
-var undoPushed       = false;   // 1配置セッションで1回だけpushUndoを呼ぶフラグ
+var stampMode        = false;
+var STAMP_LONG_MS    = 550;
+var stampLPTimer     = null;
+var undoPushed       = false;
 
 // ── Pinch ─────────────────────────────────────────────────────────
 var isPinching = false;
@@ -26,10 +26,22 @@ var DRAW_THRESHOLD=10;
 var isPanMode=false, isPanning=false;
 var panStartX=0, panStartY=0, panStartPX=0, panStartPY=0;
 
-var undoStack=[], redoStack=[], MAX_UNDO=60;
+// ── Group / Merge ─────────────────────────────────────────────────
+// gid -> { id, cells: [{c,r}, ...] }
+var groupMap = {};
+var nextGid  = 1;
 
 // ── Undo/Redo ─────────────────────────────────────────────────────
-function snapCells(){ return JSON.parse(JSON.stringify(cells)); }
+var undoStack=[], redoStack=[], MAX_UNDO=60;
+
+// groupMap も一緒にスナップショットする
+function snapCells(){
+  return {
+    cells:    JSON.parse(JSON.stringify(cells)),
+    groupMap: JSON.parse(JSON.stringify(groupMap)),
+    nextGid:  nextGid
+  };
+}
 function pushUndo(){
   undoStack.push(snapCells());
   if(undoStack.length>MAX_UNDO) undoStack.shift();
@@ -37,12 +49,16 @@ function pushUndo(){
 }
 function undo(){
   if(!undoStack.length) return;
-  redoStack.push(snapCells()); cells=undoStack.pop();
+  redoStack.push(snapCells());
+  var snap=undoStack.pop();
+  cells=snap.cells; groupMap=snap.groupMap; nextGid=snap.nextGid;
   updateUndoBtns(); scheduleRender();
 }
 function redo(){
   if(!redoStack.length) return;
-  undoStack.push(snapCells()); cells=redoStack.pop();
+  undoStack.push(snapCells());
+  var snap=redoStack.pop();
+  cells=snap.cells; groupMap=snap.groupMap; nextGid=snap.nextGid;
   updateUndoBtns(); scheduleRender();
 }
 function updateUndoBtns(){
@@ -51,42 +67,160 @@ function updateUndoBtns(){
   if(r) r.disabled=!redoStack.length;
 }
 
+// ── Merge logic ───────────────────────────────────────────────────
+// c,r にブロックを置いた後に呼ぶ。
+// 隣接する同種ブロックと 1×2 / 2×1 / 2×2 に合体させる。
+function recomputeGroups(c, r){
+  var cell = getCell(c, r);
+  if(!cell) return;
+  var id = cell.id;
+
+  // 道路・自然系（flood）はグループ化しない
+  if(isRoad(id) || isFlood(id)) return;
+
+  // 試す矩形候補（2×2 → 1×2 → 2×1 の優先順）
+  var tries = [
+    [c,   r,   2, 2], [c-1, r,   2, 2],
+    [c,   r-1, 2, 2], [c-1, r-1, 2, 2],
+    [c,   r,   2, 1], [c-1, r,   2, 1],
+    [c,   r,   1, 2], [c,   r-1, 1, 2]
+  ];
+
+  var best=null, bestGids=null;
+
+  for(var ti=0; ti<tries.length; ti++){
+    var t=tries[ti];
+    var minC=t[0], minR=t[1], w=t[2], h=t[3];
+    if(minC<0||minR<0||minC+w>COLS||minR+h>ROWS) continue;
+
+    var ok=true, cellList=[], hasCenter=false, involvedGids={};
+    for(var dc=0; dc<w&&ok; dc++){
+      for(var dr=0; dr<h&&ok; dr++){
+        var mc=getCell(minC+dc, minR+dr);
+        if(!mc||mc.id!==id){ ok=false; break; }
+        if(mc.gid) involvedGids[mc.gid]=1;
+        cellList.push({c:minC+dc, r:minR+dr});
+        if(minC+dc===c&&minR+dr===r) hasCenter=true;
+      }
+    }
+    if(!ok||!hasCenter||cellList.length<=1) continue;
+
+    // 候補が既存グループより大きい場合のみ許可
+    var maxInv=0;
+    Object.keys(involvedGids).forEach(function(g){
+      var grp=groupMap[g]; if(grp&&grp.cells.length>maxInv) maxInv=grp.cells.length;
+    });
+    if(maxInv>0&&cellList.length<=maxInv) continue;
+
+    if(!best||cellList.length>best.length){ best=cellList; bestGids=involvedGids; }
+  }
+
+  if(!best) return; // 合体なし
+
+  // 既存グループを解体
+  Object.keys(bestGids).forEach(function(gid){
+    var grp=groupMap[gid];
+    if(grp){
+      grp.cells.forEach(function(pos){
+        var mc=getCell(pos.c, pos.r); if(mc) delete mc.gid;
+      });
+      delete groupMap[gid];
+    }
+  });
+
+  // 新グループ形成
+  var gid='g'+(nextGid++);
+  best.forEach(function(pos){
+    var mc=getCell(pos.c, pos.r); if(mc) mc.gid=gid;
+  });
+  groupMap[gid]={id:id, cells:best};
+}
+
+// ロード後やクリア後に全グループを再計算する
+function recomputeAllGroups(){
+  groupMap={}; nextGid=1;
+  Object.keys(cells).forEach(function(k){ if(cells[k]) delete cells[k].gid; });
+  // painter's order で再計算
+  var keys=Object.keys(cells);
+  keys.sort(function(a,b){
+    var pa=a.split(','), pb=b.split(',');
+    return (parseInt(pa[0])+parseInt(pa[1]))-(parseInt(pb[0])+parseInt(pb[1]));
+  });
+  keys.forEach(function(k){
+    var p=k.split(','); recomputeGroups(parseInt(p[0]), parseInt(p[1]));
+  });
+}
+
+// マップ全消去（ui.js から呼ぶ）
+function clearAllCells(){
+  cells={}; groupMap={}; nextGid=1;
+  scheduleRender();
+}
+
 // ── Place/Erase ───────────────────────────────────────────────────
 function placeCell(c,r){
   if(!inGrid(c,r)) return;
   var k=ck(c,r), rid=resolveId(selectedId);
   if(cells[k]&&cells[k].id===rid) return;
-  cells[k]={id:rid,dir:'none'};
+
+  // 上書き時：既存セルのグループを解体
+  if(cells[k]&&cells[k].gid){
+    var og=cells[k].gid;
+    if(groupMap[og]){
+      groupMap[og].cells.forEach(function(p){ var mc=cells[ck(p.c,p.r)]; if(mc) delete mc.gid; });
+      delete groupMap[og];
+    }
+  }
+
+  cells[k]={id:rid, dir:'none'};
   triggerBlockAnim(c,r);
+  recomputeGroups(c,r);  // ← 合体チェック
   scheduleRender();
-  return true; // 実際に置けた
+  return true;
 }
+
 function eraseCell(c,r){
   if(!inGrid(c,r)) return;
   var k=ck(c,r); if(!cells[k]) return;
-  delete cells[k]; scheduleRender();
+
+  // グループを解体
+  var gid=cells[k].gid;
+  if(gid&&groupMap[gid]){
+    groupMap[gid].cells.forEach(function(pos){
+      var mc=cells[ck(pos.c,pos.r)]; if(mc) delete mc.gid;
+    });
+    delete groupMap[gid];
+  }
+
+  delete cells[k];
+  scheduleRender();
 }
+
 function floodFill(c,r){
   if(!inGrid(c,r)) return;
   var targetId=(cells[ck(c,r)]||{}).id||'__empty__';
   if(targetId===selectedId) return;
   pushUndo();
-  var queue=[[c,r]],visited=new Set();
+  var queue=[[c,r]], visited=new Set();
   while(queue.length){
-    var cur=queue.shift(),kk=ck(cur[0],cur[1]);
+    var cur=queue.shift(), kk=ck(cur[0],cur[1]);
     if(visited.has(kk)) continue; visited.add(kk);
     if(!inGrid(cur[0],cur[1])) continue;
     if(((cells[kk]||{}).id||'__empty__')!==targetId) continue;
-    cells[kk]={id:resolveId(selectedId),dir:'none'};
+    cells[kk]={id:resolveId(selectedId), dir:'none'};
     [[0,-1],[0,1],[-1,0],[1,0]].forEach(function(d){ queue.push([cur[0]+d[0],cur[1]+d[1]]); });
   }
+  // 配置した全セルのグループを再計算
+  visited.forEach(function(kk){
+    var p=kk.split(','); recomputeGroups(parseInt(p[0]), parseInt(p[1]));
+  });
   scheduleRender();
 }
 
 // ── Sound & Vibrate ──────────────────────────────────────────────
 var _audioCtx   = null;
 var _didPlace   = false;
-var _placeCount = 0;    // 連続配置カウント（音のピッチに使う）
+var _placeCount = 0;
 
 function _getAudioCtx(){
   if(!_audioCtx){
@@ -96,68 +230,47 @@ function _getAudioCtx(){
   return _audioCtx;
 }
 
-// ── マイクラ風ブロック配置音 ─────────────────────────────────────
-// ノイズ（質感）+ 低音サイン波（ドシュ感）の組み合わせ
-
 function _mcPlaceSound(pitchMult){
   if(!soundOn) return;
   var ctx = _getAudioCtx(); if(!ctx) return;
   pitchMult = pitchMult || 1.0;
-
   try{
     var t   = ctx.currentTime;
     var out = ctx.createGain();
     out.gain.setValueAtTime(1.0, t);
     out.connect(ctx.destination);
 
-    // ── 1. 高域ノイズ（パッという軽い質感）──────────────────
     var bufSize = Math.floor(ctx.sampleRate * 0.035);
     var buf     = ctx.createBuffer(1, bufSize, ctx.sampleRate);
     var data    = buf.getChannelData(0);
     for(var i=0; i<bufSize; i++) data[i] = (Math.random()*2-1);
-
     var noise = ctx.createBufferSource();
     noise.buffer = buf;
-
-    // ハイパスフィルタ：軽い高域成分のみ通す
     var hp = ctx.createBiquadFilter();
-    hp.type            = 'highpass';
-    hp.frequency.value = 1800 * pitchMult;
-    hp.Q.value         = 0.8;
-
+    hp.type = 'highpass'; hp.frequency.value = 1800 * pitchMult; hp.Q.value = 0.8;
     var noiseGain = ctx.createGain();
     noiseGain.gain.setValueAtTime(0.18, t);
     noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
-
-    noise.connect(hp);
-    hp.connect(noiseGain);
-    noiseGain.connect(out);
+    noise.connect(hp); hp.connect(noiseGain); noiseGain.connect(out);
     noise.start(t); noise.stop(t + 0.035);
 
-    // ── 2. 中高音サイン波（パという明るいトーン）────────────
     var body = ctx.createOscillator();
     body.type = 'sine';
     body.frequency.setValueAtTime(600 * pitchMult, t);
     body.frequency.exponentialRampToValueAtTime(300 * pitchMult, t + 0.04);
-
     var bodyGain = ctx.createGain();
     bodyGain.gain.setValueAtTime(0.14, t);
     bodyGain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
-
-    body.connect(bodyGain);
-    bodyGain.connect(out);
+    body.connect(bodyGain); bodyGain.connect(out);
     body.start(t); body.stop(t + 0.04);
-
   }catch(e){}
 }
 
-// 単発：ランダムにわずかなピッチ揺らぎ（マイクラ風）
 function _playSingleSound(){
-  var pitch = 0.92 + Math.random() * 0.16; // 0.92〜1.08
+  var pitch = 0.92 + Math.random() * 0.16;
   _mcPlaceSound(pitch);
 }
 
-// 連続：ピッチを少しずつ変えてリズム感（8音でループ）
 var _stampPitches = [1.00, 1.05, 0.97, 1.08, 0.95, 1.03, 1.10, 0.98];
 function _playStampSound(){
   var pitch = _stampPitches[_placeCount % _stampPitches.length];
@@ -166,12 +279,10 @@ function _playStampSound(){
 
 function _playAndVibe(){
   if(stampMode){
-    _playStampSound();
-    _placeCount++;
-    if(vibeOn && navigator.vibrate) navigator.vibrate(8);  // 連続は短く
+    _playStampSound(); _placeCount++;
+    if(vibeOn && navigator.vibrate) navigator.vibrate(8);
   } else {
-    _playSingleSound();
-    _placeCount = 0;  // 単発でリセット
+    _playSingleSound(); _placeCount = 0;
     if(vibeOn && navigator.vibrate) navigator.vibrate(18);
   }
 }
@@ -213,20 +324,16 @@ function togglePanMode(){
 function initInteraction(){
   var wrap=document.getElementById('canvas-wrap');
 
-  // タッチ
   wrap.addEventListener('touchstart',onTouchStart,{passive:false});
   wrap.addEventListener('touchmove', onTouchMove, {passive:false});
   wrap.addEventListener('touchend',  onTouchEnd,  {passive:false});
   wrap.addEventListener('touchcancel',onTouchEnd, {passive:false});
 
-  // mousedown は canvas-wrap に登録
   wrap.addEventListener('mousedown', onMouseDown);
-  // mousemove / mouseup は window に登録（canvas外でも追跡）
   window.addEventListener('mousemove', onWindowMouseMove);
   window.addEventListener('mouseup',   onWindowMouseUp);
   wrap.addEventListener('wheel', onWheel, {passive:false});
 
-  // ツールバー
   document.getElementById('btn-undo').addEventListener('click',undo);
   document.getElementById('btn-redo').addEventListener('click',redo);
   document.getElementById('btn-zi').addEventListener('click',function(){ zoomAround(cw/2,ch/2,1.2); scheduleRender(); });
@@ -265,7 +372,6 @@ function onTouchStart(e){
   isPointerDown=true; touchDrawStarted=false; stampedSet=new Set();
   stampStartC=cell.c; stampStartR=cell.r;
 
-  // スタンプモード長押し判定（描画ツールのみ）
   if(tool==='draw'){
     stampMode=false;
     stampLPTimer=setTimeout(function(){
@@ -276,6 +382,7 @@ function onTouchStart(e){
     }, STAMP_LONG_MS);
   }
 }
+
 function onTouchMove(e){
   e.preventDefault();
   var ts=e.touches;
@@ -300,6 +407,7 @@ function onTouchMove(e){
   if(_didPlace) _playAndVibe();
   _didPlace = false;
 }
+
 function onTouchEnd(e){
   e.preventDefault();
   if(isPinching){ if(e.touches.length<2){ isPinching=false; isPointerDown=false; touchDrawStarted=false; hoverC=-1; hoverR=-1; scheduleRender(); } return; }
@@ -307,64 +415,48 @@ function onTouchEnd(e){
   if(stampLPTimer){ clearTimeout(stampLPTimer); stampLPTimer=null; }
   _didPlace = false;
   if(isPointerDown){
-    if(!touchDrawStarted&&!stampMode){
-      handleDraw(stampStartC,stampStartR);
-    }
+    if(!touchDrawStarted&&!stampMode){ handleDraw(stampStartC,stampStartR); }
     commitStamp();
   }
-  // ここは確実に touchend（gesture）内 → 音・バイブを鳴らす
   if(_didPlace) _playAndVibe();
   _didPlace = false;
   if(!stampMode) _placeCount=0;
   isPointerDown=false; touchDrawStarted=false; stampMode=false; _placeCount=0; hoverC=-1; hoverR=-1; scheduleRender();
 }
 
-// ── Mouse ────────────────────────────────────────────────────────
-// 差分方式（delta）で pan を実装
+// ── Mouse ─────────────────────────────────────────────────────────
 var _lastMouseX = 0, _lastMouseY = 0;
 
 function onMouseDown(e){
-  // パンモード or 中クリック → pan 開始
   if(e.button===1 || (e.button===0 && isPanMode)){
     e.preventDefault();
-    isPanning   = true;
-    _lastMouseX = e.clientX;
-    _lastMouseY = e.clientY;
-    updateCursor();
-    return;
+    isPanning=true; _lastMouseX=e.clientX; _lastMouseY=e.clientY;
+    updateCursor(); return;
   }
   if(e.button!==0) return;
-  // 描画
   var cell=clientToCell(e.clientX,e.clientY);
   if(tool==='fill'){ pushUndo(); floodFill(cell.c,cell.r); return; }
   isPointerDown=true; stampStartC=cell.c; stampStartR=cell.r;
   stampedSet=new Set();
-  // 最初の1個を置く
   handleDraw(cell.c,cell.r);
-  // スタンプモード長押し判定
   if(tool==='draw'){
-    stampMode = false;
-    stampLPTimer = setTimeout(function(){
-      stampMode = true;
-      if(vibeOn && navigator.vibrate) navigator.vibrate([30,60,30]);
+    stampMode=false;
+    stampLPTimer=setTimeout(function(){
+      stampMode=true;
+      if(vibeOn&&navigator.vibrate) navigator.vibrate([30,60,30]);
       _playAndVibe();
-      stampLPTimer = null;
+      stampLPTimer=null;
     }, STAMP_LONG_MS);
   }
 }
 
 function onWindowMouseMove(e){
   if(isPanning){
-    var dx = e.clientX - _lastMouseX;
-    var dy = e.clientY - _lastMouseY;
-    panX += dx * 0.55;
-    panY += dy * 0.55;
-    _lastMouseX = e.clientX;
-    _lastMouseY = e.clientY;
-    render();   // 直接呼び出しで確実に再描画
-    return;
+    var dx=e.clientX-_lastMouseX, dy=e.clientY-_lastMouseY;
+    panX+=dx*0.55; panY+=dy*0.55;
+    _lastMouseX=e.clientX; _lastMouseY=e.clientY;
+    render(); return;
   }
-  // hover・描画（canvas内のみ）
   var rect=gc.getBoundingClientRect();
   var inside = e.clientX>=rect.left && e.clientX<=rect.right &&
                e.clientY>=rect.top  && e.clientY<=rect.bottom;
@@ -376,11 +468,11 @@ function onWindowMouseMove(e){
   var cell=clientToCell(e.clientX,e.clientY);
   hoverC=cell.c; hoverR=cell.r;
   if(isPointerDown){
-    if(stampMode) stampedSet = new Set();
-    _didPlace = false;
+    if(stampMode) stampedSet=new Set();
+    _didPlace=false;
     handleDraw(cell.c,cell.r);
     if(_didPlace) _playAndVibe();
-    _didPlace = false;
+    _didPlace=false;
   }
   scheduleRender();
 }
@@ -388,18 +480,11 @@ function onWindowMouseMove(e){
 function onWindowMouseUp(e){
   if(stampLPTimer){ clearTimeout(stampLPTimer); stampLPTimer=null; }
   stampMode=false;
-  if(isPanning){
-    isPanning=false;
-    updateCursor();
-    return;
-  }
-  _didPlace = false;
+  if(isPanning){ isPanning=false; updateCursor(); return; }
+  _didPlace=false;
   if(isPointerDown){ commitStamp(); }
-  // mouseup も gesture → 音・バイブ
   if(_didPlace) _playAndVibe();
-  _didPlace = false;
-  _placeCount = 0;
-  isPointerDown=false;
+  _didPlace=false; _placeCount=0; isPointerDown=false;
 }
 
 function onWheel(e){
@@ -417,10 +502,10 @@ function handleDraw(c,r){
   if(stampedSet.has(k)) return;
   stampedSet.add(k);
   if(!undoPushed){ pushUndo(); undoPushed=true; }
-  var placed = false;
-  if(tool==='draw')        placed = placeCell(c,r);
+  var placed=false;
+  if(tool==='draw')        placed=placeCell(c,r);
   else if(tool==='erase'){ eraseCell(c,r); placed=true; }
-  if(placed) _didPlace = true;  // gesture側で音・バイブを鳴らすためのフラグ
+  if(placed) _didPlace=true;
   lastC=c; lastR=r;
 }
 function commitStamp(){ stampedSet=new Set(); undoPushed=false; }
