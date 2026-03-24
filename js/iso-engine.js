@@ -271,7 +271,7 @@ function render(){
     gctx.fillStyle=sky2; gctx.fillRect(0,0,cw,ch);
   }
 
-  // Painter's order (small c+r first = back to front)
+  // Painter's order
   var tileList=[];
   for(var r2=0;r2<ROWS;r2++){
     for(var c2=0;c2<COLS;c2++) tileList.push([c2,r2]);
@@ -288,105 +288,65 @@ function render(){
     drawDiamond(gctx, s.x, s.y, gfill, gstroke, 0.5);
   });
 
-  // ── Pass 2: ブロック描画 ─────────────────────────────────────
-  // グループに属するセルは「最初に描画順で出てきたとき1枚絵で描く」
-  // それ以外のグループセルはスキップして重複描画を防ぐ
-  var drawnGidsP2 = {};
-
+  // ── Pass 2: 全ブロックを通常の1×1で描画 ─────────────────────
+  // ※ グループもここでは個別描画。視覚的な「くっつき」は
+  //    カスタム画像を用意したときに差し替え可能にする設計。
   tileList.forEach(function(cr){
     var c=cr[0], r=cr[1];
     var cell=getCell(c,r);
     if(!cell) return;
-
-    // グループ判定
-    var grpData = (cell.gid && typeof groupMap !== 'undefined')
-                  ? groupMap[cell.gid] : null;
-
-    if(grpData && grpData.cells.length >= 2){
-      // ── グループ → 拡大1枚絵で描画 ──────────────────────────
-      if(drawnGidsP2[cell.gid]) return;  // 2個目以降のセルはスキップ
-      drawnGidsP2[cell.gid] = true;
-
-      var bbox = groupBBox(grpData.cells);
-
-      // グループの「見た目の中心」= bbox中央のセルのスクリーン座標
-      var midC = bbox.minC + (bbox.w - 1) / 2;
-      var midR = bbox.minR + (bbox.h - 1) / 2;
-      var midS = cellToScreen(midC, midR);
-
-      // アンカーセル（minC,minR）のスクリーン座標を drawBlock に渡す
-      var anchorS = cellToScreen(bbox.minC, bbox.minR);
-
-      // スケール: 1×2 or 2×1 → √2 ≈ 1.41 / 2×2 → 2.0
-      var groupScale = Math.sqrt(bbox.w * bbox.h);
-      var animScale  = getBlockScale(bbox.minC, bbox.minR);
-
-      // ピボット = グループ中央の底辺中心
-      var pivotX = midS.x;
-      var pivotY = midS.y + HH * zoom;
-
+    var s=cellToScreen(c,r);
+    var scale=getBlockScale(c,r);
+    if(scale !== 1){
+      var cx2=s.x, cy2=s.y+HH*zoom;
       gctx.save();
-      gctx.translate(pivotX, pivotY);
-      gctx.scale(groupScale * animScale, groupScale * animScale);
-      gctx.translate(-pivotX, -pivotY);
-      drawBlock(gctx, bbox.minC, bbox.minR, anchorS.x, anchorS.y, cell.id, cell.dir);
+      gctx.translate(cx2,cy2);
+      gctx.scale(scale,scale);
+      gctx.translate(-cx2,-cy2);
+      drawBlock(gctx,c,r,s.x,s.y,cell.id,cell.dir);
       gctx.restore();
-
     } else {
-      // ── 1×1 通常描画 ────────────────────────────────────────
-      var s = cellToScreen(c,r);
-      var scale = getBlockScale(c,r);
-      if(scale !== 1){
-        var cx2 = s.x, cy2 = s.y + HH*zoom;
-        gctx.save();
-        gctx.translate(cx2, cy2);
-        gctx.scale(scale, scale);
-        gctx.translate(-cx2, -cy2);
-        drawBlock(gctx, c, r, s.x, s.y, cell.id, cell.dir);
-        gctx.restore();
-      } else {
-        drawBlock(gctx, c, r, s.x, s.y, cell.id, cell.dir);
-      }
+      drawBlock(gctx,c,r,s.x,s.y,cell.id,cell.dir);
     }
   });
 
   // ── Pass 3: グループ枠 + サイズラベル ────────────────────────
+  // 軽量化のため：グループの描画済みフラグを1回だけ処理
   if(typeof groupMap !== 'undefined'){
-    var drawnGidsP3 = {};
+    var drawnGids = {};
     tileList.forEach(function(cr){
       var c=cr[0], r=cr[1];
       var cell=getCell(c,r);
       if(!cell || !cell.gid) return;
-      if(drawnGidsP3[cell.gid]) return;
-      drawnGidsP3[cell.gid] = true;
+      if(drawnGids[cell.gid]) return;
+      drawnGids[cell.gid] = true;
       var grp = groupMap[cell.gid];
       if(!grp || grp.cells.length < 2) return;
 
-      // 各セルにゴールド枠
+      var bbox = groupBBox(grp.cells);
+
+      // グループ内の全セルにゴールド枠を描く
       grp.cells.forEach(function(pos){
         var s = cellToScreen(pos.c, pos.r);
-        drawDiamond(gctx, s.x, s.y, null, 'rgba(245,200,66,0.70)', 1.8);
+        drawDiamond(gctx, s.x, s.y, null, 'rgba(245,200,66,0.80)', 2.0);
       });
 
-      // サイズラベル（グループ中央上部）
-      var bbox = groupBBox(grp.cells);
-      var midC = bbox.minC + (bbox.w - 1) / 2;
-      var midR = bbox.minR + (bbox.h - 1) / 2;
-      var midS = cellToScreen(midC, midR);
-      var bh   = (BLOCKS[grp.id] ? BLOCKS[grp.id].bh : 30);
-      // グループスケール分だけ上に配置
-      var groupScale = Math.sqrt(bbox.w * bbox.h);
-      var labelX = midS.x;
-      var labelY = midS.y - bh * zoom * groupScale * 1.05;
-      var fs  = Math.max(9, Math.min(16, zoom * 12));
+      // サイズラベル（グループ最前面セルの上部）
+      var frontC = bbox.minC + bbox.w - 1;
+      var frontR = bbox.minR + bbox.h - 1;
+      var frontS = cellToScreen(frontC, frontR);
+      var bh = BLOCKS[grp.id] ? BLOCKS[grp.id].bh : 30;
+      var labelX = frontS.x;
+      var labelY = frontS.y - bh * zoom - 4 * zoom;
+      var fs  = Math.max(9, Math.min(15, zoom * 11));
       var lbl = bbox.w + '×' + bbox.h;
       gctx.save();
       gctx.font = 'bold ' + fs + 'px sans-serif';
       gctx.textAlign = 'center';
       gctx.textBaseline = 'bottom';
       var tw = gctx.measureText(lbl).width;
-      gctx.fillStyle = 'rgba(0,0,0,0.65)';
-      gctx.fillRect(labelX - tw/2 - 3, labelY - fs - 2, tw + 6, fs + 4);
+      gctx.fillStyle = 'rgba(0,0,0,0.70)';
+      gctx.fillRect(labelX-tw/2-3, labelY-fs-2, tw+6, fs+4);
       gctx.fillStyle = '#f5c842';
       gctx.fillText(lbl, labelX, labelY);
       gctx.restore();
