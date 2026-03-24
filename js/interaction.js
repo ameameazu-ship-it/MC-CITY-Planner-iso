@@ -7,7 +7,7 @@ var stampedSet       = new Set();
 var stampStartC=-1,  stampStartR=-1;
 var longPressTimer   = null, lpC=-1, lpR=-1;
 
-// ── Stamp mode（長押しで連続配置ON）─────────────────────────────
+// ── Stamp mode ────────────────────────────────────────────────────
 var stampMode        = false;
 var STAMP_LONG_MS    = 550;
 var stampLPTimer     = null;
@@ -27,14 +27,36 @@ var isPanMode=false, isPanning=false;
 var panStartX=0, panStartY=0, panStartPX=0, panStartPY=0;
 
 // ── Group / Merge ─────────────────────────────────────────────────
-// gid -> { id, cells: [{c,r}, ...] }
-var groupMap = {};
+var groupMap = {};   // gid -> { id, cells:[{c,r},...] }
 var nextGid  = 1;
+
+// ── バリアントの「根」ID を引くテーブル ───────────────────────────
+// house2/house3 なども house1 と同種として扱う
+// constants.js の BLOCKS 定義後に initVariantRoot() を呼ぶ
+var variantRoot = {};   // id -> rootId
+
+function initVariantRoot(){
+  variantRoot = {};
+  Object.keys(BLOCKS).forEach(function(id){
+    var b = BLOCKS[id];
+    if(b.variants && b.variants.length){
+      b.variants.forEach(function(v){ variantRoot[v] = id; });
+    } else {
+      variantRoot[id] = id;
+    }
+  });
+}
+
+// 同種ブロックか判定（バリアント違いも同種とみなす）
+function sameKind(idA, idB){
+  var rA = variantRoot[idA] || idA;
+  var rB = variantRoot[idB] || idB;
+  return rA === rB;
+}
 
 // ── Undo/Redo ─────────────────────────────────────────────────────
 var undoStack=[], redoStack=[], MAX_UNDO=60;
 
-// groupMap も一緒にスナップショットする
 function snapCells(){
   return {
     cells:    JSON.parse(JSON.stringify(cells)),
@@ -68,8 +90,6 @@ function updateUndoBtns(){
 }
 
 // ── Merge logic ───────────────────────────────────────────────────
-// c,r にブロックを置いた後に呼ぶ。
-// 隣接する同種ブロックと 1×2 / 2×1 / 2×2 に合体させる。
 function recomputeGroups(c, r){
   var cell = getCell(c, r);
   if(!cell) return;
@@ -78,7 +98,7 @@ function recomputeGroups(c, r){
   // 道路・自然系（flood）はグループ化しない
   if(isRoad(id) || isFlood(id)) return;
 
-  // 試す矩形候補（2×2 → 1×2 → 2×1 の優先順）
+  // 試す矩形候補（大きい順）
   var tries = [
     [c,   r,   2, 2], [c-1, r,   2, 2],
     [c,   r-1, 2, 2], [c-1, r-1, 2, 2],
@@ -97,25 +117,25 @@ function recomputeGroups(c, r){
     for(var dc=0; dc<w&&ok; dc++){
       for(var dr=0; dr<h&&ok; dr++){
         var mc=getCell(minC+dc, minR+dr);
-        if(!mc||mc.id!==id){ ok=false; break; }
+        // ★ sameKind() でバリアント違いも同種と判定
+        if(!mc || !sameKind(mc.id, id)){ ok=false; break; }
         if(mc.gid) involvedGids[mc.gid]=1;
         cellList.push({c:minC+dc, r:minR+dr});
-        if(minC+dc===c&&minR+dr===r) hasCenter=true;
+        if(minC+dc===c && minR+dr===r) hasCenter=true;
       }
     }
-    if(!ok||!hasCenter||cellList.length<=1) continue;
+    if(!ok || !hasCenter || cellList.length<=1) continue;
 
-    // 候補が既存グループより大きい場合のみ許可
     var maxInv=0;
     Object.keys(involvedGids).forEach(function(g){
       var grp=groupMap[g]; if(grp&&grp.cells.length>maxInv) maxInv=grp.cells.length;
     });
-    if(maxInv>0&&cellList.length<=maxInv) continue;
+    if(maxInv>0 && cellList.length<=maxInv) continue;
 
-    if(!best||cellList.length>best.length){ best=cellList; bestGids=involvedGids; }
+    if(!best || cellList.length>best.length){ best=cellList; bestGids=involvedGids; }
   }
 
-  if(!best) return; // 合体なし
+  if(!best) return;
 
   // 既存グループを解体
   Object.keys(bestGids).forEach(function(gid){
@@ -133,25 +153,9 @@ function recomputeGroups(c, r){
   best.forEach(function(pos){
     var mc=getCell(pos.c, pos.r); if(mc) mc.gid=gid;
   });
-  groupMap[gid]={id:id, cells:best};
+  groupMap[gid]={ id:id, cells:best };
 }
 
-// ロード後やクリア後に全グループを再計算する
-function recomputeAllGroups(){
-  groupMap={}; nextGid=1;
-  Object.keys(cells).forEach(function(k){ if(cells[k]) delete cells[k].gid; });
-  // painter's order で再計算
-  var keys=Object.keys(cells);
-  keys.sort(function(a,b){
-    var pa=a.split(','), pb=b.split(',');
-    return (parseInt(pa[0])+parseInt(pa[1]))-(parseInt(pb[0])+parseInt(pb[1]));
-  });
-  keys.forEach(function(k){
-    var p=k.split(','); recomputeGroups(parseInt(p[0]), parseInt(p[1]));
-  });
-}
-
-// マップ全消去（ui.js から呼ぶ）
 function clearAllCells(){
   cells={}; groupMap={}; nextGid=1;
   scheduleRender();
@@ -161,10 +165,10 @@ function clearAllCells(){
 function placeCell(c,r){
   if(!inGrid(c,r)) return;
   var k=ck(c,r), rid=resolveId(selectedId);
-  if(cells[k]&&cells[k].id===rid) return;
+  if(cells[k] && cells[k].id===rid) return;
 
-  // 上書き時：既存セルのグループを解体
-  if(cells[k]&&cells[k].gid){
+  // 上書き時：既存グループを解体
+  if(cells[k] && cells[k].gid){
     var og=cells[k].gid;
     if(groupMap[og]){
       groupMap[og].cells.forEach(function(p){ var mc=cells[ck(p.c,p.r)]; if(mc) delete mc.gid; });
@@ -174,7 +178,7 @@ function placeCell(c,r){
 
   cells[k]={id:rid, dir:'none'};
   triggerBlockAnim(c,r);
-  recomputeGroups(c,r);  // ← 合体チェック
+  recomputeGroups(c,r);
   scheduleRender();
   return true;
 }
@@ -183,9 +187,8 @@ function eraseCell(c,r){
   if(!inGrid(c,r)) return;
   var k=ck(c,r); if(!cells[k]) return;
 
-  // グループを解体
   var gid=cells[k].gid;
-  if(gid&&groupMap[gid]){
+  if(gid && groupMap[gid]){
     groupMap[gid].cells.forEach(function(pos){
       var mc=cells[ck(pos.c,pos.r)]; if(mc) delete mc.gid;
     });
@@ -210,7 +213,6 @@ function floodFill(c,r){
     cells[kk]={id:resolveId(selectedId), dir:'none'};
     [[0,-1],[0,1],[-1,0],[1,0]].forEach(function(d){ queue.push([cur[0]+d[0],cur[1]+d[1]]); });
   }
-  // 配置した全セルのグループを再計算
   visited.forEach(function(kk){
     var p=kk.split(','); recomputeGroups(parseInt(p[0]), parseInt(p[1]));
   });
@@ -239,51 +241,40 @@ function _mcPlaceSound(pitchMult){
     var out = ctx.createGain();
     out.gain.setValueAtTime(1.0, t);
     out.connect(ctx.destination);
-
     var bufSize = Math.floor(ctx.sampleRate * 0.035);
     var buf     = ctx.createBuffer(1, bufSize, ctx.sampleRate);
     var data    = buf.getChannelData(0);
     for(var i=0; i<bufSize; i++) data[i] = (Math.random()*2-1);
-    var noise = ctx.createBufferSource();
-    noise.buffer = buf;
+    var noise = ctx.createBufferSource(); noise.buffer = buf;
     var hp = ctx.createBiquadFilter();
-    hp.type = 'highpass'; hp.frequency.value = 1800 * pitchMult; hp.Q.value = 0.8;
+    hp.type = 'highpass'; hp.frequency.value = 1800*pitchMult; hp.Q.value = 0.8;
     var noiseGain = ctx.createGain();
     noiseGain.gain.setValueAtTime(0.18, t);
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, t+0.03);
     noise.connect(hp); hp.connect(noiseGain); noiseGain.connect(out);
-    noise.start(t); noise.stop(t + 0.035);
-
-    var body = ctx.createOscillator();
-    body.type = 'sine';
-    body.frequency.setValueAtTime(600 * pitchMult, t);
-    body.frequency.exponentialRampToValueAtTime(300 * pitchMult, t + 0.04);
+    noise.start(t); noise.stop(t+0.035);
+    var body = ctx.createOscillator(); body.type='sine';
+    body.frequency.setValueAtTime(600*pitchMult, t);
+    body.frequency.exponentialRampToValueAtTime(300*pitchMult, t+0.04);
     var bodyGain = ctx.createGain();
     bodyGain.gain.setValueAtTime(0.14, t);
-    bodyGain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+    bodyGain.gain.exponentialRampToValueAtTime(0.001, t+0.04);
     body.connect(bodyGain); bodyGain.connect(out);
-    body.start(t); body.stop(t + 0.04);
+    body.start(t); body.stop(t+0.04);
   }catch(e){}
 }
 
-function _playSingleSound(){
-  var pitch = 0.92 + Math.random() * 0.16;
-  _mcPlaceSound(pitch);
-}
-
-var _stampPitches = [1.00, 1.05, 0.97, 1.08, 0.95, 1.03, 1.10, 0.98];
-function _playStampSound(){
-  var pitch = _stampPitches[_placeCount % _stampPitches.length];
-  _mcPlaceSound(pitch);
-}
+function _playSingleSound(){ _mcPlaceSound(0.92+Math.random()*0.16); }
+var _stampPitches=[1.00,1.05,0.97,1.08,0.95,1.03,1.10,0.98];
+function _playStampSound(){ _mcPlaceSound(_stampPitches[_placeCount%_stampPitches.length]); }
 
 function _playAndVibe(){
   if(stampMode){
     _playStampSound(); _placeCount++;
-    if(vibeOn && navigator.vibrate) navigator.vibrate(8);
+    if(vibeOn&&navigator.vibrate) navigator.vibrate(8);
   } else {
-    _playSingleSound(); _placeCount = 0;
-    if(vibeOn && navigator.vibrate) navigator.vibrate(18);
+    _playSingleSound(); _placeCount=0;
+    if(vibeOn&&navigator.vibrate) navigator.vibrate(18);
   }
 }
 
@@ -309,10 +300,10 @@ function setTool(t2){
 // ── Cursor ────────────────────────────────────────────────────────
 function updateCursor(){
   if(!gc) return;
-  gc.style.cursor = isPanning ? 'grabbing' : (isPanMode ? 'grab' : 'crosshair');
+  gc.style.cursor = isPanning?'grabbing':(isPanMode?'grab':'crosshair');
 }
 
-// ── Pan mode toggle ────────────────────────────────────────────────
+// ── Pan mode toggle ───────────────────────────────────────────────
 function togglePanMode(){
   isPanMode=!isPanMode;
   var btn=document.getElementById('btn-center');
@@ -322,13 +313,14 @@ function togglePanMode(){
 
 // ── Init ──────────────────────────────────────────────────────────
 function initInteraction(){
-  var wrap=document.getElementById('canvas-wrap');
+  // ★ バリアントテーブルを初期化（BLOCKS が読み込まれた後）
+  initVariantRoot();
 
+  var wrap=document.getElementById('canvas-wrap');
   wrap.addEventListener('touchstart',onTouchStart,{passive:false});
   wrap.addEventListener('touchmove', onTouchMove, {passive:false});
   wrap.addEventListener('touchend',  onTouchEnd,  {passive:false});
   wrap.addEventListener('touchcancel',onTouchEnd, {passive:false});
-
   wrap.addEventListener('mousedown', onMouseDown);
   window.addEventListener('mousemove', onWindowMouseMove);
   window.addEventListener('mouseup',   onWindowMouseUp);
@@ -371,14 +363,12 @@ function onTouchStart(e){
   },480);
   isPointerDown=true; touchDrawStarted=false; stampedSet=new Set();
   stampStartC=cell.c; stampStartR=cell.r;
-
   if(tool==='draw'){
     stampMode=false;
     stampLPTimer=setTimeout(function(){
       stampMode=true;
       if(vibeOn&&navigator.vibrate) navigator.vibrate([30,60,30]);
-      _playAndVibe();
-      stampLPTimer=null;
+      _playAndVibe(); stampLPTimer=null;
     }, STAMP_LONG_MS);
   }
 }
@@ -401,11 +391,11 @@ function onTouchMove(e){
   hoverC=cell.c; hoverR=cell.r;
   if(!touchDrawStarted&&Math.sqrt(dx*dx+dy*dy)<DRAW_THRESHOLD){ scheduleRender(); return; }
   touchDrawStarted=true;
-  if(stampMode) stampedSet = new Set();
-  _didPlace = false;
+  if(stampMode) stampedSet=new Set();
+  _didPlace=false;
   handleDraw(cell.c,cell.r);
   if(_didPlace) _playAndVibe();
-  _didPlace = false;
+  _didPlace=false;
 }
 
 function onTouchEnd(e){
@@ -413,22 +403,22 @@ function onTouchEnd(e){
   if(isPinching){ if(e.touches.length<2){ isPinching=false; isPointerDown=false; touchDrawStarted=false; hoverC=-1; hoverR=-1; scheduleRender(); } return; }
   cancelLongPress();
   if(stampLPTimer){ clearTimeout(stampLPTimer); stampLPTimer=null; }
-  _didPlace = false;
+  _didPlace=false;
   if(isPointerDown){
     if(!touchDrawStarted&&!stampMode){ handleDraw(stampStartC,stampStartR); }
     commitStamp();
   }
   if(_didPlace) _playAndVibe();
-  _didPlace = false;
+  _didPlace=false;
   if(!stampMode) _placeCount=0;
   isPointerDown=false; touchDrawStarted=false; stampMode=false; _placeCount=0; hoverC=-1; hoverR=-1; scheduleRender();
 }
 
 // ── Mouse ─────────────────────────────────────────────────────────
-var _lastMouseX = 0, _lastMouseY = 0;
+var _lastMouseX=0, _lastMouseY=0;
 
 function onMouseDown(e){
-  if(e.button===1 || (e.button===0 && isPanMode)){
+  if(e.button===1||(e.button===0&&isPanMode)){
     e.preventDefault();
     isPanning=true; _lastMouseX=e.clientX; _lastMouseY=e.clientY;
     updateCursor(); return;
@@ -444,8 +434,7 @@ function onMouseDown(e){
     stampLPTimer=setTimeout(function(){
       stampMode=true;
       if(vibeOn&&navigator.vibrate) navigator.vibrate([30,60,30]);
-      _playAndVibe();
-      stampLPTimer=null;
+      _playAndVibe(); stampLPTimer=null;
     }, STAMP_LONG_MS);
   }
 }
@@ -458,8 +447,7 @@ function onWindowMouseMove(e){
     render(); return;
   }
   var rect=gc.getBoundingClientRect();
-  var inside = e.clientX>=rect.left && e.clientX<=rect.right &&
-               e.clientY>=rect.top  && e.clientY<=rect.bottom;
+  var inside=e.clientX>=rect.left&&e.clientX<=rect.right&&e.clientY>=rect.top&&e.clientY<=rect.bottom;
   if(!inside){
     if(hoverC>=0){ hoverC=-1; hoverR=-1; scheduleRender(); }
     if(isPointerDown){ commitStamp(); isPointerDown=false; }
@@ -498,7 +486,7 @@ function onWheel(e){
 function handleDraw(c,r){
   if(!inGrid(c,r)) return;
   var k=ck(c,r);
-  if(tool==='draw' && !stampMode && stampedSet.size >= 1) return;
+  if(tool==='draw'&&!stampMode&&stampedSet.size>=1) return;
   if(stampedSet.has(k)) return;
   stampedSet.add(k);
   if(!undoPushed){ pushUndo(); undoPushed=true; }
