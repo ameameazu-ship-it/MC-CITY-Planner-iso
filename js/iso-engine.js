@@ -47,23 +47,17 @@ var bgTheme = 'default';
 
 var BG_THEMES = {
   'default': ['#0d0d12', '#05050a', '#1a1a22', '#10101a',
-              'rgba(255,255,255,0.13)',
-              '#0a0a2e', '#04041a'],
+              'rgba(255,255,255,0.13)', '#0a0a2e', '#04041a'],
   'grass'  : ['#0e4020', '#061a08', '#2e5a30', '#0c2212',
-              'rgba(255,255,255,0.12)',
-              '#061428', '#030c10'],
+              'rgba(255,255,255,0.12)', '#061428', '#030c10'],
   'desert' : ['#5a3010', '#2e1808', '#8c6030', '#5a3e1a',
-              'rgba(0,0,0,0.20)',
-              '#180e28', '#0c0814'],
+              'rgba(0,0,0,0.20)', '#180e28', '#0c0814'],
   'snow'   : ['#4a7aaa', '#1e3a60', '#7aaccc', '#7aaac0',
-              'rgba(20,50,90,0.30)',
-              '#0c1e3e', '#060e22'],
+              'rgba(20,50,90,0.30)', '#0c1e3e', '#060e22'],
   'ocean'  : ['#040e22', '#020810', '#0a3060', '#061838',
-              'rgba(255,255,255,0.14)',
-              '#020614', '#01030c'],
+              'rgba(255,255,255,0.14)', '#020614', '#01030c'],
   'stone'  : ['#1e1e28', '#0c0c14', '#48485a', '#28283c',
-              'rgba(255,255,255,0.11)',
-              '#0e0e22', '#06060e']
+              'rgba(255,255,255,0.11)', '#0e0e22', '#06060e']
 };
 
 function getBgPalette(){
@@ -156,9 +150,8 @@ function isoBox(ctx, x, y, bh, tc, lc, rc){
 function isoGableEW(ctx, x, y, bh, rh, tc, lc, rc){
   var hw=HW*zoom, hh=HH*zoom, zb=bh*zoom, zr=rh*zoom;
   var by=y-zb;
-  var N={x:x,    y:by},        E={x:x+hw, y:by+hh};
-  var S={x:x,    y:by+2*hh},   W={x:x-hw, y:by+hh};
-  var RW={x:x-hw,y:by+hh-zr},  RE={x:x+hw,y:by+hh-zr};
+  var N={x:x,y:by}, E={x:x+hw,y:by+hh}, S={x:x,y:by+2*hh}, W={x:x-hw,y:by+hh};
+  var RW={x:x-hw,y:by+hh-zr}, RE={x:x+hw,y:by+hh-zr};
   ctx.beginPath(); ctx.moveTo(W.x,W.y); ctx.lineTo(N.x,N.y); ctx.lineTo(RE.x,RE.y); ctx.lineTo(RW.x,RW.y); ctx.closePath(); ctx.fillStyle=lc; ctx.fill();
   ctx.beginPath(); ctx.moveTo(E.x,E.y); ctx.lineTo(S.x,S.y); ctx.lineTo(RW.x,RW.y); ctx.lineTo(RE.x,RE.y); ctx.closePath(); ctx.fillStyle=rc; ctx.fill();
   ctx.beginPath(); ctx.moveTo(N.x,N.y); ctx.lineTo(E.x,E.y); ctx.lineTo(RE.x,RE.y); ctx.closePath(); ctx.fillStyle=tc; ctx.fill();
@@ -169,9 +162,8 @@ function isoGableEW(ctx, x, y, bh, rh, tc, lc, rc){
 function isoGableNS(ctx, x, y, bh, rh, tc, lc, rc){
   var hw=HW*zoom, hh=HH*zoom, zb=bh*zoom, zr=rh*zoom;
   var by=y-zb;
-  var N={x:x,  y:by},       E={x:x+hw, y:by+hh};
-  var S={x:x,  y:by+2*hh},  W={x:x-hw, y:by+hh};
-  var RN={x:x, y:by-zr},    RS={x:x,   y:by+2*hh-zr};
+  var N={x:x,y:by}, E={x:x+hw,y:by+hh}, S={x:x,y:by+2*hh}, W={x:x-hw,y:by+hh};
+  var RN={x:x,y:by-zr}, RS={x:x,y:by+2*hh-zr};
   ctx.beginPath(); ctx.moveTo(W.x,W.y); ctx.lineTo(N.x,N.y); ctx.lineTo(RN.x,RN.y); ctx.lineTo(RS.x,RS.y); ctx.closePath(); ctx.fillStyle=lc; ctx.fill();
   ctx.beginPath(); ctx.moveTo(E.x,E.y); ctx.lineTo(S.x,S.y); ctx.lineTo(RS.x,RS.y); ctx.lineTo(RN.x,RN.y); ctx.closePath(); ctx.fillStyle=rc; ctx.fill();
   ctx.beginPath(); ctx.moveTo(N.x,N.y); ctx.lineTo(E.x,E.y); ctx.lineTo(RN.x,RN.y); ctx.closePath(); ctx.fillStyle=tc; ctx.fill();
@@ -182,9 +174,8 @@ function isoGableNS(ctx, x, y, bh, rh, tc, lc, rc){
 function isoHipRoof(ctx, x, y, bh, rh, lc, rc){
   var hw=HW*zoom, hh=HH*zoom, zb=bh*zoom, zr=rh*zoom;
   var by=y-zb;
-  var N={x:x,   y:by},       E={x:x+hw, y:by+hh};
-  var S={x:x,   y:by+2*hh},  W={x:x-hw, y:by+hh};
-  var tip={x:x, y:by-zr};
+  var N={x:x,y:by}, E={x:x+hw,y:by+hh}, S={x:x,y:by+2*hh}, W={x:x-hw,y:by+hh};
+  var tip={x:x,y:by-zr};
   ctx.beginPath(); ctx.moveTo(N.x,N.y); ctx.lineTo(E.x,E.y); ctx.lineTo(tip.x,tip.y); ctx.closePath(); ctx.fillStyle=rc; ctx.fill();
   ctx.beginPath(); ctx.moveTo(E.x,E.y); ctx.lineTo(S.x,S.y); ctx.lineTo(tip.x,tip.y); ctx.closePath(); ctx.fillStyle=rc; ctx.fill();
   ctx.beginPath(); ctx.moveTo(S.x,S.y); ctx.lineTo(W.x,W.y); ctx.lineTo(tip.x,tip.y); ctx.closePath(); ctx.fillStyle=lc; ctx.fill();
@@ -193,22 +184,18 @@ function isoHipRoof(ctx, x, y, bh, rh, lc, rc){
 
 // ── Draw: cylinder ───────────────────────────────────────────────
 function isoCylinder(ctx, x, y, bh, r, tc, bc){
-  var zb=bh*zoom, zr=r*zoom;
-  var hh=HH*zoom;
+  var zb=bh*zoom, zr=r*zoom, hh=HH*zoom;
   var cx2=x, cy2=y+hh;
   ctx.save();
   var grad=ctx.createLinearGradient(cx2-zr,cy2,cx2+zr,cy2);
   grad.addColorStop(0,   shadeC(bc,0.55));
   grad.addColorStop(0.4, bc);
   grad.addColorStop(1,   shadeC(bc,0.72));
-  ctx.beginPath();
-  ctx.ellipse(cx2, cy2-zb, zr, zr*0.5, 0, 0, Math.PI*2);
+  ctx.beginPath(); ctx.ellipse(cx2,cy2-zb,zr,zr*0.5,0,0,Math.PI*2);
   ctx.fillStyle=tc; ctx.fill();
-  ctx.beginPath();
-  ctx.rect(cx2-zr, cy2-zb, zr*2, zb);
+  ctx.beginPath(); ctx.rect(cx2-zr,cy2-zb,zr*2,zb);
   ctx.fillStyle=grad; ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(cx2, cy2, zr, zr*0.5, 0, Math.PI, 0);
+  ctx.beginPath(); ctx.ellipse(cx2,cy2,zr,zr*0.5,0,Math.PI,0);
   ctx.fillStyle=shadeC(bc,0.7); ctx.fill();
   ctx.restore();
 }
@@ -218,10 +205,10 @@ function winL(ctx, x, y, zbh, u, v, wu, vh, c){
   var hw=HW*zoom, hh=HH*zoom;
   var ax=x-hw, ay=y+hh;
   ctx.beginPath();
-  ctx.moveTo(ax+u*hw,        ay-u*hh        -v*zbh);
-  ctx.lineTo(ax+(u+wu)*hw,   ay-(u+wu)*hh   -v*zbh);
-  ctx.lineTo(ax+(u+wu)*hw,   ay-(u+wu)*hh   -(v+vh)*zbh);
-  ctx.lineTo(ax+u*hw,        ay-u*hh        -(v+vh)*zbh);
+  ctx.moveTo(ax+u*hw,      ay-u*hh      -v*zbh);
+  ctx.lineTo(ax+(u+wu)*hw, ay-(u+wu)*hh -v*zbh);
+  ctx.lineTo(ax+(u+wu)*hw, ay-(u+wu)*hh -(v+vh)*zbh);
+  ctx.lineTo(ax+u*hw,      ay-u*hh      -(v+vh)*zbh);
   ctx.closePath(); ctx.fillStyle=c; ctx.fill();
 }
 
@@ -253,16 +240,16 @@ function mixC(a,b,t){
   }).join('');
 }
 
-// ── Render-order sort ────────────────────────────────────────────
-function renderSortKey(c,r){ return c+r; }
-
-// ── Night overlay ────────────────────────────────────────────────
-function drawNightOverlay(ctx){
-  ctx.save();
-  ctx.globalCompositeOperation='multiply';
-  ctx.fillStyle='rgba(10,15,40,0.72)';
-  ctx.fillRect(0,0,cw,ch);
-  ctx.restore();
+// ── グループのバウンディングボックスを計算 ───────────────────────
+function groupBBox(cells2){
+  var minC=cells2[0].c, maxC=cells2[0].c, minR=cells2[0].r, maxR=cells2[0].r;
+  for(var i=1;i<cells2.length;i++){
+    if(cells2[i].c<minC) minC=cells2[i].c;
+    if(cells2[i].c>maxC) maxC=cells2[i].c;
+    if(cells2[i].r<minR) minR=cells2[i].r;
+    if(cells2[i].r>maxR) maxR=cells2[i].r;
+  }
+  return {minC:minC, maxC:maxC, minR:minR, maxR:maxR, w:maxC-minC+1, h:maxR-minR+1};
 }
 
 // ── Main render ──────────────────────────────────────────────────
@@ -275,8 +262,8 @@ function render(){
   // Sky background
   if(nightMode){
     var sky=gctx.createLinearGradient(0,0,0,ch);
-    sky.addColorStop(0, pal[5] || shadeC(pal[0], 0.28));
-    sky.addColorStop(1, pal[6] || shadeC(pal[1], 0.22));
+    sky.addColorStop(0, pal[5]||shadeC(pal[0],0.28));
+    sky.addColorStop(1, pal[6]||shadeC(pal[1],0.22));
     gctx.fillStyle=sky; gctx.fillRect(0,0,cw,ch);
   } else {
     var sky2=gctx.createLinearGradient(0,0,0,ch);
@@ -284,12 +271,10 @@ function render(){
     gctx.fillStyle=sky2; gctx.fillRect(0,0,cw,ch);
   }
 
-  // Build sorted tile list (painter's order)
+  // Painter's order (small c+r first = back to front)
   var tileList=[];
   for(var r2=0;r2<ROWS;r2++){
-    for(var c2=0;c2<COLS;c2++){
-      tileList.push([c2,r2]);
-    }
+    for(var c2=0;c2<COLS;c2++) tileList.push([c2,r2]);
   }
   tileList.sort(function(a,b){ return (a[0]+a[1])-(b[0]+b[1]); });
 
@@ -298,73 +283,113 @@ function render(){
     var c=cr[0], r=cr[1];
     var s=cellToScreen(c,r);
     var gfill  = nightMode ? pal[3] : pal[2];
-    var nightGrid = (bgTheme === 'snow') ? 'rgba(30,70,120,0.35)' : 'rgba(255,255,255,0.09)';
-    var gstroke= showGrid  ? (nightMode ? nightGrid : pal[4]) : null;
+    var nightGrid = (bgTheme==='snow') ? 'rgba(30,70,120,0.35)' : 'rgba(255,255,255,0.09)';
+    var gstroke = showGrid ? (nightMode ? nightGrid : pal[4]) : null;
     drawDiamond(gctx, s.x, s.y, gfill, gstroke, 0.5);
   });
 
-  // ── Pass 2: 全ブロック ───────────────────────────────────────
+  // ── Pass 2: ブロック描画 ─────────────────────────────────────
+  // グループに属するセルは「最初に描画順で出てきたとき1枚絵で描く」
+  // それ以外のグループセルはスキップして重複描画を防ぐ
+  var drawnGidsP2 = {};
+
   tileList.forEach(function(cr){
     var c=cr[0], r=cr[1];
     var cell=getCell(c,r);
-    if(cell){
-      var s=cellToScreen(c,r);
-      var scale=getBlockScale(c,r);
-      if(scale!==1){
-        var cx=s.x, cy=s.y+HH*zoom;
+    if(!cell) return;
+
+    // グループ判定
+    var grpData = (cell.gid && typeof groupMap !== 'undefined')
+                  ? groupMap[cell.gid] : null;
+
+    if(grpData && grpData.cells.length >= 2){
+      // ── グループ → 拡大1枚絵で描画 ──────────────────────────
+      if(drawnGidsP2[cell.gid]) return;  // 2個目以降のセルはスキップ
+      drawnGidsP2[cell.gid] = true;
+
+      var bbox = groupBBox(grpData.cells);
+
+      // グループの「見た目の中心」= bbox中央のセルのスクリーン座標
+      var midC = bbox.minC + (bbox.w - 1) / 2;
+      var midR = bbox.minR + (bbox.h - 1) / 2;
+      var midS = cellToScreen(midC, midR);
+
+      // アンカーセル（minC,minR）のスクリーン座標を drawBlock に渡す
+      var anchorS = cellToScreen(bbox.minC, bbox.minR);
+
+      // スケール: 1×2 or 2×1 → √2 ≈ 1.41 / 2×2 → 2.0
+      var groupScale = Math.sqrt(bbox.w * bbox.h);
+      var animScale  = getBlockScale(bbox.minC, bbox.minR);
+
+      // ピボット = グループ中央の底辺中心
+      var pivotX = midS.x;
+      var pivotY = midS.y + HH * zoom;
+
+      gctx.save();
+      gctx.translate(pivotX, pivotY);
+      gctx.scale(groupScale * animScale, groupScale * animScale);
+      gctx.translate(-pivotX, -pivotY);
+      drawBlock(gctx, bbox.minC, bbox.minR, anchorS.x, anchorS.y, cell.id, cell.dir);
+      gctx.restore();
+
+    } else {
+      // ── 1×1 通常描画 ────────────────────────────────────────
+      var s = cellToScreen(c,r);
+      var scale = getBlockScale(c,r);
+      if(scale !== 1){
+        var cx2 = s.x, cy2 = s.y + HH*zoom;
         gctx.save();
-        gctx.translate(cx,cy);
-        gctx.scale(scale,scale);
-        gctx.translate(-cx,-cy);
-        drawBlock(gctx,c,r,s.x,s.y,cell.id,cell.dir);
+        gctx.translate(cx2, cy2);
+        gctx.scale(scale, scale);
+        gctx.translate(-cx2, -cy2);
+        drawBlock(gctx, c, r, s.x, s.y, cell.id, cell.dir);
         gctx.restore();
       } else {
-        drawBlock(gctx,c,r,s.x,s.y,cell.id,cell.dir);
+        drawBlock(gctx, c, r, s.x, s.y, cell.id, cell.dir);
       }
     }
   });
 
-  // ── Pass 3: グループ枠（同種ブロックのくっつき表示）─────────
-  // groupMap は interaction.js で定義されているグローバル変数
+  // ── Pass 3: グループ枠 + サイズラベル ────────────────────────
   if(typeof groupMap !== 'undefined'){
-    var drawnGids = {};
+    var drawnGidsP3 = {};
     tileList.forEach(function(cr){
       var c=cr[0], r=cr[1];
       var cell=getCell(c,r);
-      if(!cell||!cell.gid) return;
-      var gid=cell.gid;
-      if(drawnGids[gid]) return;
-      drawnGids[gid]=true;
-      var grp=groupMap[gid];
-      if(!grp||grp.cells.length<2) return;
+      if(!cell || !cell.gid) return;
+      if(drawnGidsP3[cell.gid]) return;
+      drawnGidsP3[cell.gid] = true;
+      var grp = groupMap[cell.gid];
+      if(!grp || grp.cells.length < 2) return;
 
-      // グループ内の全セルにゴールドの枠を描く
+      // 各セルにゴールド枠
       grp.cells.forEach(function(pos){
-        var s=cellToScreen(pos.c, pos.r);
-        drawDiamond(gctx, s.x, s.y, null, 'rgba(245,200,66,0.80)', 2.0);
+        var s = cellToScreen(pos.c, pos.r);
+        drawDiamond(gctx, s.x, s.y, null, 'rgba(245,200,66,0.70)', 1.8);
       });
 
-      // グループサイズラベル（2×2 など）
+      // サイズラベル（グループ中央上部）
       var bbox = groupBBox(grp.cells);
-      if(bbox.w >= 2 || bbox.h >= 2){
-        var anchorS = cellToScreen(bbox.minC, bbox.minR);
-        var hw = HW*zoom, hh = HH*zoom;
-        // ラベルをグループ上部中央に表示
-        var labelX = anchorS.x + (bbox.w - bbox.h) * hw * 0.5;
-        var labelY = anchorS.y - 4*zoom;
-        var fs = Math.max(9, Math.min(16, zoom*13));
-        gctx.save();
-        gctx.font = 'bold '+fs+'px sans-serif';
-        gctx.textAlign = 'center';
-        gctx.textBaseline = 'bottom';
-        var lbl = bbox.w+'×'+bbox.h;
-        var tw = gctx.measureText(lbl).width;
-        gctx.fillStyle = 'rgba(0,0,0,0.65)';
-        gctx.fillRect(labelX-tw/2-3, labelY-fs-2, tw+6, fs+4);
-        gctx.fillStyle = '#f5c842';
-        gctx.fillText(lbl, labelX, labelY);
-        gctx.restore();
-      }
+      var midC = bbox.minC + (bbox.w - 1) / 2;
+      var midR = bbox.minR + (bbox.h - 1) / 2;
+      var midS = cellToScreen(midC, midR);
+      var bh   = (BLOCKS[grp.id] ? BLOCKS[grp.id].bh : 30);
+      // グループスケール分だけ上に配置
+      var groupScale = Math.sqrt(bbox.w * bbox.h);
+      var labelX = midS.x;
+      var labelY = midS.y - bh * zoom * groupScale * 1.05;
+      var fs  = Math.max(9, Math.min(16, zoom * 12));
+      var lbl = bbox.w + '×' + bbox.h;
+      gctx.save();
+      gctx.font = 'bold ' + fs + 'px sans-serif';
+      gctx.textAlign = 'center';
+      gctx.textBaseline = 'bottom';
+      var tw = gctx.measureText(lbl).width;
+      gctx.fillStyle = 'rgba(0,0,0,0.65)';
+      gctx.fillRect(labelX - tw/2 - 3, labelY - fs - 2, tw + 6, fs + 4);
+      gctx.fillStyle = '#f5c842';
+      gctx.fillText(lbl, labelX, labelY);
+      gctx.restore();
     });
   }
 
@@ -382,16 +407,6 @@ function render(){
 
 function scheduleRender(){
   if(!dirty){ dirty=true; requestAnimationFrame(render); }
-}
-
-// ── グループのバウンディングボックスを計算 ───────────────────────
-function groupBBox(cells2){
-  var minC=cells2[0].c, maxC=cells2[0].c, minR=cells2[0].r, maxR=cells2[0].r;
-  for(var i=1;i<cells2.length;i++){
-    if(cells2[i].c<minC) minC=cells2[i].c; if(cells2[i].c>maxC) maxC=cells2[i].c;
-    if(cells2[i].r<minR) minR=cells2[i].r; if(cells2[i].r>maxR) maxR=cells2[i].r;
-  }
-  return {minC:minC, maxC:maxC, minR:minR, maxR:maxR, w:maxC-minC+1, h:maxR-minR+1};
 }
 
 // ── dispatch to per-block draw functions ─────────────────────────
