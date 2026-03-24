@@ -8,10 +8,10 @@ var stampStartC=-1,  stampStartR=-1;
 var longPressTimer   = null, lpC=-1, lpR=-1;
 
 // ── Stamp mode ────────────────────────────────────────────────────
-var stampMode        = false;
-var STAMP_LONG_MS    = 550;
-var stampLPTimer     = null;
-var undoPushed       = false;
+var stampMode     = false;
+var STAMP_LONG_MS = 550;
+var stampLPTimer  = null;
+var undoPushed    = false;
 
 // ── Pinch ─────────────────────────────────────────────────────────
 var isPinching = false;
@@ -24,34 +24,23 @@ var DRAW_THRESHOLD=10;
 
 // ── Pan ───────────────────────────────────────────────────────────
 var isPanMode=false, isPanning=false;
-var panStartX=0, panStartY=0, panStartPX=0, panStartPY=0;
+var _lastMouseX=0, _lastMouseY=0;
 
 // ── Group / Merge ─────────────────────────────────────────────────
-var groupMap = {};   // gid -> { id, cells:[{c,r},...] }
+var groupMap = {};   // gid -> { cells:[{c,r},...] }
 var nextGid  = 1;
 
-// ── バリアントの「根」ID を引くテーブル ───────────────────────────
-// house2/house3 なども house1 と同種として扱う
-// constants.js の BLOCKS 定義後に initVariantRoot() を呼ぶ
-var variantRoot = {};   // id -> rootId
-
-function initVariantRoot(){
-  variantRoot = {};
-  Object.keys(BLOCKS).forEach(function(id){
-    var b = BLOCKS[id];
-    if(b.variants && b.variants.length){
-      b.variants.forEach(function(v){ variantRoot[v] = id; });
-    } else {
-      variantRoot[id] = id;
-    }
-  });
+// IDの末尾数字を除いた「種別」を返す
+// house1,house2,house3 → "house"
+// apt1,apt2            → "apt"
+// road,water           → "road","water"（数字なし→そのまま）
+function mergeId(id){
+  return id.replace(/\d+$/, '');
 }
 
-// 同種ブロックか判定（バリアント違いも同種とみなす）
+// 同種ブロックか（バリアント番号違いも同種）
 function sameKind(idA, idB){
-  var rA = variantRoot[idA] || idA;
-  var rB = variantRoot[idB] || idB;
-  return rA === rB;
+  return mergeId(idA) === mergeId(idB);
 }
 
 // ── Undo/Redo ─────────────────────────────────────────────────────
@@ -84,21 +73,24 @@ function redo(){
   updateUndoBtns(); scheduleRender();
 }
 function updateUndoBtns(){
-  var u=document.getElementById('btn-undo'),r=document.getElementById('btn-redo');
+  var u=document.getElementById('btn-undo'), r=document.getElementById('btn-redo');
   if(u) u.disabled=!undoStack.length;
   if(r) r.disabled=!redoStack.length;
 }
 
 // ── Merge logic ───────────────────────────────────────────────────
+// ブロックを置いた/消した後に呼ぶ。
+// 最大 2×2 まで同種ブロックをグループ化する。
 function recomputeGroups(c, r){
   var cell = getCell(c, r);
   if(!cell) return;
   var id = cell.id;
 
-  // 道路・自然系（flood）はグループ化しない
+  // 道路・flood系はグループ化しない
   if(isRoad(id) || isFlood(id)) return;
 
   // 試す矩形候補（大きい順）
+  // [minC, minR, w, h]
   var tries = [
     [c,   r,   2, 2], [c-1, r,   2, 2],
     [c,   r-1, 2, 2], [c-1, r-1, 2, 2],
@@ -114,11 +106,14 @@ function recomputeGroups(c, r){
     if(minC<0||minR<0||minC+w>COLS||minR+h>ROWS) continue;
 
     var ok=true, cellList=[], hasCenter=false, involvedGids={};
+
     for(var dc=0; dc<w&&ok; dc++){
       for(var dr=0; dr<h&&ok; dr++){
-        var mc=getCell(minC+dc, minR+dr);
-        // ★ sameKind() でバリアント違いも同種と判定
-        if(!mc || !sameKind(mc.id, id)){ ok=false; break; }
+        var mc = getCell(minC+dc, minR+dr);
+        // ★ sameKind() で house1/house2 も同種と判定
+        if(!mc || !sameKind(mc.id, id)){
+          ok=false; break;
+        }
         if(mc.gid) involvedGids[mc.gid]=1;
         cellList.push({c:minC+dc, r:minR+dr});
         if(minC+dc===c && minR+dr===r) hasCenter=true;
@@ -126,34 +121,83 @@ function recomputeGroups(c, r){
     }
     if(!ok || !hasCenter || cellList.length<=1) continue;
 
+    // 既存グループより大きい候補のみ採用
     var maxInv=0;
     Object.keys(involvedGids).forEach(function(g){
-      var grp=groupMap[g]; if(grp&&grp.cells.length>maxInv) maxInv=grp.cells.length;
+      var grp=groupMap[g];
+      if(grp && grp.cells.length>maxInv) maxInv=grp.cells.length;
     });
     if(maxInv>0 && cellList.length<=maxInv) continue;
 
-    if(!best || cellList.length>best.length){ best=cellList; bestGids=involvedGids; }
+    // より大きい候補を優先
+    if(!best || cellList.length>best.length){
+      best=cellList; bestGids=involvedGids;
+    }
   }
 
-  if(!best) return;
+  if(!best) return;  // 合体なし
 
   // 既存グループを解体
   Object.keys(bestGids).forEach(function(gid){
     var grp=groupMap[gid];
     if(grp){
       grp.cells.forEach(function(pos){
-        var mc=getCell(pos.c, pos.r); if(mc) delete mc.gid;
+        var mc=getCell(pos.c, pos.r);
+        if(mc) delete mc.gid;
       });
       delete groupMap[gid];
     }
   });
 
   // 新グループ形成
-  var gid='g'+(nextGid++);
+  var newGid='g'+(nextGid++);
   best.forEach(function(pos){
-    var mc=getCell(pos.c, pos.r); if(mc) mc.gid=gid;
+    var mc=getCell(pos.c, pos.r);
+    if(mc) mc.gid=newGid;
   });
-  groupMap[gid]={ id:id, cells:best };
+  groupMap[newGid]={ cells: best, id: id };
+}
+
+// ── Place/Erase ───────────────────────────────────────────────────
+function placeCell(c, r){
+  if(!inGrid(c,r)) return false;
+  var k  = ck(c,r);
+  var rid= resolveId(selectedId);
+
+  // 同じIDが既にあればスキップ
+  if(cells[k] && cells[k].id===rid) return false;
+
+  // 既存セルのグループを解体
+  _dissolveGroup(c, r);
+
+  cells[k] = {id:rid, dir:'none'};
+  triggerBlockAnim(c, r);
+  recomputeGroups(c, r);
+  scheduleRender();
+  return true;
+}
+
+function eraseCell(c, r){
+  if(!inGrid(c,r)) return;
+  var k=ck(c,r);
+  if(!cells[k]) return;
+  _dissolveGroup(c, r);
+  delete cells[k];
+  scheduleRender();
+}
+
+// gid がついているセルのグループを解体するヘルパー
+function _dissolveGroup(c, r){
+  var mc = getCell(c, r);
+  if(!mc || !mc.gid) return;
+  var grp = groupMap[mc.gid];
+  if(grp){
+    grp.cells.forEach(function(pos){
+      var m=getCell(pos.c, pos.r);
+      if(m) delete m.gid;
+    });
+    delete groupMap[mc.gid];
+  }
 }
 
 function clearAllCells(){
@@ -161,45 +205,7 @@ function clearAllCells(){
   scheduleRender();
 }
 
-// ── Place/Erase ───────────────────────────────────────────────────
-function placeCell(c,r){
-  if(!inGrid(c,r)) return;
-  var k=ck(c,r), rid=resolveId(selectedId);
-  if(cells[k] && cells[k].id===rid) return;
-
-  // 上書き時：既存グループを解体
-  if(cells[k] && cells[k].gid){
-    var og=cells[k].gid;
-    if(groupMap[og]){
-      groupMap[og].cells.forEach(function(p){ var mc=cells[ck(p.c,p.r)]; if(mc) delete mc.gid; });
-      delete groupMap[og];
-    }
-  }
-
-  cells[k]={id:rid, dir:'none'};
-  triggerBlockAnim(c,r);
-  recomputeGroups(c,r);
-  scheduleRender();
-  return true;
-}
-
-function eraseCell(c,r){
-  if(!inGrid(c,r)) return;
-  var k=ck(c,r); if(!cells[k]) return;
-
-  var gid=cells[k].gid;
-  if(gid && groupMap[gid]){
-    groupMap[gid].cells.forEach(function(pos){
-      var mc=cells[ck(pos.c,pos.r)]; if(mc) delete mc.gid;
-    });
-    delete groupMap[gid];
-  }
-
-  delete cells[k];
-  scheduleRender();
-}
-
-function floodFill(c,r){
+function floodFill(c, r){
   if(!inGrid(c,r)) return;
   var targetId=(cells[ck(c,r)]||{}).id||'__empty__';
   if(targetId===selectedId) return;
@@ -220,64 +226,43 @@ function floodFill(c,r){
 }
 
 // ── Sound & Vibrate ──────────────────────────────────────────────
-var _audioCtx   = null;
-var _didPlace   = false;
-var _placeCount = 0;
+var _audioCtx=null, _didPlace=false, _placeCount=0;
 
 function _getAudioCtx(){
   if(!_audioCtx){
-    try{ _audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; }
+    try{ _audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; }
   }
-  if(_audioCtx.state === 'suspended') _audioCtx.resume();
+  if(_audioCtx.state==='suspended') _audioCtx.resume();
   return _audioCtx;
 }
-
 function _mcPlaceSound(pitchMult){
   if(!soundOn) return;
-  var ctx = _getAudioCtx(); if(!ctx) return;
-  pitchMult = pitchMult || 1.0;
+  var ctx=_getAudioCtx(); if(!ctx) return;
+  pitchMult=pitchMult||1.0;
   try{
-    var t   = ctx.currentTime;
-    var out = ctx.createGain();
-    out.gain.setValueAtTime(1.0, t);
-    out.connect(ctx.destination);
-    var bufSize = Math.floor(ctx.sampleRate * 0.035);
-    var buf     = ctx.createBuffer(1, bufSize, ctx.sampleRate);
-    var data    = buf.getChannelData(0);
-    for(var i=0; i<bufSize; i++) data[i] = (Math.random()*2-1);
-    var noise = ctx.createBufferSource(); noise.buffer = buf;
-    var hp = ctx.createBiquadFilter();
-    hp.type = 'highpass'; hp.frequency.value = 1800*pitchMult; hp.Q.value = 0.8;
-    var noiseGain = ctx.createGain();
-    noiseGain.gain.setValueAtTime(0.18, t);
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, t+0.03);
-    noise.connect(hp); hp.connect(noiseGain); noiseGain.connect(out);
-    noise.start(t); noise.stop(t+0.035);
-    var body = ctx.createOscillator(); body.type='sine';
-    body.frequency.setValueAtTime(600*pitchMult, t);
-    body.frequency.exponentialRampToValueAtTime(300*pitchMult, t+0.04);
-    var bodyGain = ctx.createGain();
-    bodyGain.gain.setValueAtTime(0.14, t);
-    bodyGain.gain.exponentialRampToValueAtTime(0.001, t+0.04);
-    body.connect(bodyGain); bodyGain.connect(out);
-    body.start(t); body.stop(t+0.04);
+    var t=ctx.currentTime;
+    var out=ctx.createGain(); out.gain.setValueAtTime(1.0,t); out.connect(ctx.destination);
+    var bufSize=Math.floor(ctx.sampleRate*0.035);
+    var buf=ctx.createBuffer(1,bufSize,ctx.sampleRate);
+    var data=buf.getChannelData(0);
+    for(var i=0;i<bufSize;i++) data[i]=(Math.random()*2-1);
+    var noise=ctx.createBufferSource(); noise.buffer=buf;
+    var hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=1800*pitchMult; hp.Q.value=0.8;
+    var ng=ctx.createGain(); ng.gain.setValueAtTime(0.18,t); ng.gain.exponentialRampToValueAtTime(0.001,t+0.03);
+    noise.connect(hp); hp.connect(ng); ng.connect(out); noise.start(t); noise.stop(t+0.035);
+    var body=ctx.createOscillator(); body.type='sine';
+    body.frequency.setValueAtTime(600*pitchMult,t); body.frequency.exponentialRampToValueAtTime(300*pitchMult,t+0.04);
+    var bg=ctx.createGain(); bg.gain.setValueAtTime(0.14,t); bg.gain.exponentialRampToValueAtTime(0.001,t+0.04);
+    body.connect(bg); bg.connect(out); body.start(t); body.stop(t+0.04);
   }catch(e){}
 }
-
 function _playSingleSound(){ _mcPlaceSound(0.92+Math.random()*0.16); }
 var _stampPitches=[1.00,1.05,0.97,1.08,0.95,1.03,1.10,0.98];
 function _playStampSound(){ _mcPlaceSound(_stampPitches[_placeCount%_stampPitches.length]); }
-
 function _playAndVibe(){
-  if(stampMode){
-    _playStampSound(); _placeCount++;
-    if(vibeOn&&navigator.vibrate) navigator.vibrate(8);
-  } else {
-    _playSingleSound(); _placeCount=0;
-    if(vibeOn&&navigator.vibrate) navigator.vibrate(18);
-  }
+  if(stampMode){ _playStampSound(); _placeCount++; if(vibeOn&&navigator.vibrate) navigator.vibrate(8); }
+  else{ _playSingleSound(); _placeCount=0; if(vibeOn&&navigator.vibrate) navigator.vibrate(18); }
 }
-
 function vibrateShort(){ if(vibeOn&&navigator.vibrate) navigator.vibrate(18); }
 function vibrateLong(){  if(vibeOn&&navigator.vibrate) navigator.vibrate(30); }
 
@@ -287,7 +272,7 @@ function clientToCell(cx,cy){
   return screenToCell(cx-r.left, cy-r.top);
 }
 function ptDist(a,b){ var dx=a.clientX-b.clientX,dy=a.clientY-b.clientY; return Math.sqrt(dx*dx+dy*dy); }
-function ptMid(a,b){ return {x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2}; }
+function ptMid(a,b){ return {x:(a.clientX+b.clientX)/2, y:(a.clientY+b.clientY)/2}; }
 
 // ── Tool ──────────────────────────────────────────────────────────
 function setTool(t2){
@@ -300,7 +285,7 @@ function setTool(t2){
 // ── Cursor ────────────────────────────────────────────────────────
 function updateCursor(){
   if(!gc) return;
-  gc.style.cursor = isPanning?'grabbing':(isPanMode?'grab':'crosshair');
+  gc.style.cursor=isPanning?'grabbing':(isPanMode?'grab':'crosshair');
 }
 
 // ── Pan mode toggle ───────────────────────────────────────────────
@@ -313,17 +298,14 @@ function togglePanMode(){
 
 // ── Init ──────────────────────────────────────────────────────────
 function initInteraction(){
-  // ★ バリアントテーブルを初期化（BLOCKS が読み込まれた後）
-  initVariantRoot();
-
   var wrap=document.getElementById('canvas-wrap');
-  wrap.addEventListener('touchstart',onTouchStart,{passive:false});
-  wrap.addEventListener('touchmove', onTouchMove, {passive:false});
-  wrap.addEventListener('touchend',  onTouchEnd,  {passive:false});
-  wrap.addEventListener('touchcancel',onTouchEnd, {passive:false});
-  wrap.addEventListener('mousedown', onMouseDown);
-  window.addEventListener('mousemove', onWindowMouseMove);
-  window.addEventListener('mouseup',   onWindowMouseUp);
+  wrap.addEventListener('touchstart', onTouchStart, {passive:false});
+  wrap.addEventListener('touchmove',  onTouchMove,  {passive:false});
+  wrap.addEventListener('touchend',   onTouchEnd,   {passive:false});
+  wrap.addEventListener('touchcancel',onTouchEnd,   {passive:false});
+  wrap.addEventListener('mousedown',  onMouseDown);
+  window.addEventListener('mousemove',onWindowMouseMove);
+  window.addEventListener('mouseup',  onWindowMouseUp);
   wrap.addEventListener('wheel', onWheel, {passive:false});
 
   document.getElementById('btn-undo').addEventListener('click',undo);
@@ -331,9 +313,9 @@ function initInteraction(){
   document.getElementById('btn-zi').addEventListener('click',function(){ zoomAround(cw/2,ch/2,1.2); scheduleRender(); });
   document.getElementById('btn-zo').addEventListener('click',function(){ zoomAround(cw/2,ch/2,0.83); scheduleRender(); });
   document.getElementById('btn-center').addEventListener('click',togglePanMode);
-  document.getElementById('tool-draw').addEventListener('click',  function(){ setTool('draw');  });
+  document.getElementById('tool-draw').addEventListener('click',  function(){ setTool('draw'); });
   document.getElementById('tool-erase').addEventListener('click', function(){ setTool('erase'); });
-  document.getElementById('tool-fill').addEventListener('click',  function(){ setTool('fill');  });
+  document.getElementById('tool-fill').addEventListener('click',  function(){ setTool('fill'); });
   document.getElementById('sel-preview').addEventListener('click',openSheet);
 
   updateCursor();
@@ -400,23 +382,25 @@ function onTouchMove(e){
 
 function onTouchEnd(e){
   e.preventDefault();
-  if(isPinching){ if(e.touches.length<2){ isPinching=false; isPointerDown=false; touchDrawStarted=false; hoverC=-1; hoverR=-1; scheduleRender(); } return; }
+  if(isPinching){
+    if(e.touches.length<2){ isPinching=false; isPointerDown=false; touchDrawStarted=false; hoverC=-1; hoverR=-1; scheduleRender(); }
+    return;
+  }
   cancelLongPress();
   if(stampLPTimer){ clearTimeout(stampLPTimer); stampLPTimer=null; }
   _didPlace=false;
   if(isPointerDown){
-    if(!touchDrawStarted&&!stampMode){ handleDraw(stampStartC,stampStartR); }
+    if(!touchDrawStarted&&!stampMode) handleDraw(stampStartC,stampStartR);
     commitStamp();
   }
   if(_didPlace) _playAndVibe();
   _didPlace=false;
   if(!stampMode) _placeCount=0;
-  isPointerDown=false; touchDrawStarted=false; stampMode=false; _placeCount=0; hoverC=-1; hoverR=-1; scheduleRender();
+  isPointerDown=false; touchDrawStarted=false; stampMode=false; _placeCount=0;
+  hoverC=-1; hoverR=-1; scheduleRender();
 }
 
 // ── Mouse ─────────────────────────────────────────────────────────
-var _lastMouseX=0, _lastMouseY=0;
-
 function onMouseDown(e){
   if(e.button===1||(e.button===0&&isPanMode)){
     e.preventDefault();
@@ -470,7 +454,7 @@ function onWindowMouseUp(e){
   stampMode=false;
   if(isPanning){ isPanning=false; updateCursor(); return; }
   _didPlace=false;
-  if(isPointerDown){ commitStamp(); }
+  if(isPointerDown) commitStamp();
   if(_didPlace) _playAndVibe();
   _didPlace=false; _placeCount=0; isPointerDown=false;
 }
@@ -483,7 +467,7 @@ function onWheel(e){
 }
 
 // ── Draw logic ────────────────────────────────────────────────────
-function handleDraw(c,r){
+function handleDraw(c, r){
   if(!inGrid(c,r)) return;
   var k=ck(c,r);
   if(tool==='draw'&&!stampMode&&stampedSet.size>=1) return;
