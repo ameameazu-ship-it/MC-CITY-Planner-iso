@@ -101,18 +101,29 @@ function _playLongPressSound(){
   if(!soundOn)return;var ctx=_getAudioCtx();if(!ctx)return;
   try{
     var t=ctx.currentTime,out=ctx.createGain();out.gain.setValueAtTime(1,t);out.connect(ctx.destination);
-    // 低音サイン波（ずっしり）
+    // 低音サイン波（ずっしり・大きく）
     var o=ctx.createOscillator();o.type='sine';
-    o.frequency.setValueAtTime(80,t);o.frequency.exponentialRampToValueAtTime(38,t+0.30);
-    var g=ctx.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.65,t+0.015);g.gain.exponentialRampToValueAtTime(0.001,t+0.35);
-    o.connect(g);g.connect(out);o.start(t);o.stop(t+0.36);
-    // 低域ノイズ（質感）
-    var bs=Math.floor(ctx.sampleRate*0.04),buf=ctx.createBuffer(1,bs,ctx.sampleRate),d=buf.getChannelData(0);
+    o.frequency.setValueAtTime(65,t);o.frequency.exponentialRampToValueAtTime(28,t+0.35);
+    var g=ctx.createGain();
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(1.0,t+0.01);   // 素早く最大音量へ
+    g.gain.exponentialRampToValueAtTime(0.001,t+0.40);
+    o.connect(g);g.connect(out);o.start(t);o.stop(t+0.42);
+    // サブベース（さらに低い倍音で厚みを出す）
+    var o2=ctx.createOscillator();o2.type='sine';
+    o2.frequency.setValueAtTime(32,t);o2.frequency.exponentialRampToValueAtTime(18,t+0.30);
+    var g2=ctx.createGain();
+    g2.gain.setValueAtTime(0,t);
+    g2.gain.linearRampToValueAtTime(0.55,t+0.012);
+    g2.gain.exponentialRampToValueAtTime(0.001,t+0.35);
+    o2.connect(g2);g2.connect(out);o2.start(t);o2.stop(t+0.36);
+    // 低域ノイズ（衝撃感）
+    var bs=Math.floor(ctx.sampleRate*0.05),buf=ctx.createBuffer(1,bs,ctx.sampleRate),d=buf.getChannelData(0);
     for(var i=0;i<bs;i++)d[i]=(Math.random()*2-1);
     var n=ctx.createBufferSource();n.buffer=buf;
-    var lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=200;
-    var ng=ctx.createGain();ng.gain.setValueAtTime(0.20,t);ng.gain.exponentialRampToValueAtTime(0.001,t+0.05);
-    n.connect(lp);lp.connect(ng);ng.connect(out);n.start(t);n.stop(t+0.05);
+    var lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=180;
+    var ng=ctx.createGain();ng.gain.setValueAtTime(0.40,t);ng.gain.exponentialRampToValueAtTime(0.001,t+0.06);
+    n.connect(lp);lp.connect(ng);ng.connect(out);n.start(t);n.stop(t+0.06);
   }catch(e){}
 }
 
