@@ -15,8 +15,8 @@ function getBlockScale(c,r){var key=ck(c,r);if(!blockAnims[key])return 1;var e=p
 // ★ 沈み込みアニメ
 // 長押し成功時：ブロックが少し下に沈んでから戻る（ゆっくり沈んで素早く戻る）
 var sinkAnims={};        // ck -> startTime
-var SINK_DURATION=380;   // ms
-var SINK_DEPTH=0.12;     // セル高さに対する沈み込み量（0.12 = 12%）
+var SINK_DURATION=420;   // ms
+var SINK_DEPTH=0.55;     // セル高さに対する沈み込み量（大きく沈む）
 
 function triggerSinkAnim(c,r){
   var cell=getCell(c,r);if(!cell)return;
@@ -37,14 +37,14 @@ function getSinkOffset(c,r){
   if(elapsed>=SINK_DURATION){delete sinkAnims[key];return 0;}
   var t=elapsed/SINK_DURATION;
   var offset;
-  if(t<0.45){
-    // 前半：ゆっくり沈む（ease-in）
-    var u=t/0.45;
-    offset=SINK_DEPTH*(u*u);
+  if(t<0.25){
+    // 前半：素早く深く沈む（ease-in cubic）
+    var u=t/0.25;
+    offset=SINK_DEPTH*(u*u*u);
   } else {
-    // 後半：素早く戻る（ease-out）
-    var u=(t-0.45)/0.55;
-    offset=SINK_DEPTH*(1-u);
+    // 後半：ゆっくり戻る（ease-out quad）
+    var u=(t-0.25)/0.75;
+    offset=SINK_DEPTH*(1-u*u);
   }
   return offset * HH * zoom;  // ピクセル換算
 }
