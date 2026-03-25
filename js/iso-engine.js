@@ -15,8 +15,8 @@ function getBlockScale(c,r){var key=ck(c,r);if(!blockAnims[key])return 1;var e=p
 // ★ 沈み込みアニメ
 // 長押し成功時：ブロックが少し下に沈んでから戻る（ゆっくり沈んで素早く戻る）
 var sinkAnims={};        // ck -> startTime
-var SINK_DURATION=420;   // ms
-var SINK_DEPTH=0.55;     // セル高さに対する沈み込み量（大きく沈む）
+var SINK_DURATION=450;   // ms
+var SINK_DEPTH=4.5;      // セル高さに対する沈み込み量（約63px@zoom1.1）
 
 function triggerSinkAnim(c,r){
   var cell=getCell(c,r);if(!cell)return;
