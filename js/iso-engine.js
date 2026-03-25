@@ -42,6 +42,38 @@ function getBlockScale(c, r){
   return _popScale(elapsed / ANIM_DURATION);
 }
 
+// ── Drag flash animation ──────────────────────────────────────────
+// 長押し成功時にブロックをゴールドで光らせるアニメ（バイブ代替）
+var dragFlashAnims = {};   // ck(c,r) -> startTime
+var DRAG_FLASH_DURATION = 420;  // ms
+
+function triggerDragFlash(c, r){
+  // グループ全体に適用
+  var cell = getCell(c, r);
+  if(!cell) return;
+  var keys = [];
+  if(cell.gid && typeof groupMap !== 'undefined' && groupMap[cell.gid]){
+    groupMap[cell.gid].cells.forEach(function(pos){ keys.push(ck(pos.c, pos.r)); });
+  } else {
+    keys.push(ck(c, r));
+  }
+  var now = performance.now();
+  keys.forEach(function(k){ dragFlashAnims[k] = now; });
+  dirty = false;
+  scheduleRender();
+}
+
+// フラッシュの輝度（0→1→0）
+function _getDragFlash(c, r){
+  var key = ck(c, r);
+  if(!dragFlashAnims[key]) return 0;
+  var elapsed = performance.now() - dragFlashAnims[key];
+  if(elapsed >= DRAG_FLASH_DURATION){ delete dragFlashAnims[key]; return 0; }
+  // 0→0.5で上昇、0.5→1で下降（鐘形）
+  var t = elapsed / DRAG_FLASH_DURATION;
+  return 1 - Math.abs(t * 2 - 1);  // 0→1→0
+}
+
 // ── Background theme ─────────────────────────────────────────────
 var bgTheme = 'default';
 
@@ -188,15 +220,12 @@ function isoCylinder(ctx, x, y, bh, r, tc, bc){
   var cx2=x, cy2=y+hh;
   ctx.save();
   var grad=ctx.createLinearGradient(cx2-zr,cy2,cx2+zr,cy2);
-  grad.addColorStop(0,   shadeC(bc,0.55));
+  grad.addColorStop(0, shadeC(bc,0.55));
   grad.addColorStop(0.4, bc);
-  grad.addColorStop(1,   shadeC(bc,0.72));
-  ctx.beginPath(); ctx.ellipse(cx2,cy2-zb,zr,zr*0.5,0,0,Math.PI*2);
-  ctx.fillStyle=tc; ctx.fill();
-  ctx.beginPath(); ctx.rect(cx2-zr,cy2-zb,zr*2,zb);
-  ctx.fillStyle=grad; ctx.fill();
-  ctx.beginPath(); ctx.ellipse(cx2,cy2,zr,zr*0.5,0,Math.PI,0);
-  ctx.fillStyle=shadeC(bc,0.7); ctx.fill();
+  grad.addColorStop(1, shadeC(bc,0.72));
+  ctx.beginPath(); ctx.ellipse(cx2,cy2-zb,zr,zr*0.5,0,0,Math.PI*2); ctx.fillStyle=tc; ctx.fill();
+  ctx.beginPath(); ctx.rect(cx2-zr,cy2-zb,zr*2,zb); ctx.fillStyle=grad; ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx2,cy2,zr,zr*0.5,0,Math.PI,0); ctx.fillStyle=shadeC(bc,0.7); ctx.fill();
   ctx.restore();
 }
 
@@ -224,30 +253,22 @@ function winR(ctx, x, y, zbh, u, v, wu, vh, c){
 
 // ── Colour utilities ─────────────────────────────────────────────
 function shadeC(hex, f){
-  var r=parseInt(hex.slice(1,3),16),
-      g=parseInt(hex.slice(3,5),16),
-      b=parseInt(hex.slice(5,7),16);
-  return '#'+[r,g,b].map(function(v){
-    return Math.round(Math.max(0,Math.min(255,v*f))).toString(16).padStart(2,'0');
-  }).join('');
+  var r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return '#'+[r,g,b].map(function(v){ return Math.round(Math.max(0,Math.min(255,v*f))).toString(16).padStart(2,'0'); }).join('');
 }
 
 function mixC(a,b,t){
   var ar=parseInt(a.slice(1,3),16),ag=parseInt(a.slice(3,5),16),ab_=parseInt(a.slice(5,7),16);
   var br=parseInt(b.slice(1,3),16),bg=parseInt(b.slice(3,5),16),bb=parseInt(b.slice(5,7),16);
-  return '#'+[ar+(br-ar)*t,ag+(bg-ag)*t,ab_+(bb-ab_)*t].map(function(v){
-    return Math.round(v).toString(16).padStart(2,'0');
-  }).join('');
+  return '#'+[ar+(br-ar)*t,ag+(bg-ag)*t,ab_+(bb-ab_)*t].map(function(v){ return Math.round(v).toString(16).padStart(2,'0'); }).join('');
 }
 
 // ── グループのバウンディングボックスを計算 ───────────────────────
 function groupBBox(cells2){
   var minC=cells2[0].c, maxC=cells2[0].c, minR=cells2[0].r, maxR=cells2[0].r;
   for(var i=1;i<cells2.length;i++){
-    if(cells2[i].c<minC) minC=cells2[i].c;
-    if(cells2[i].c>maxC) maxC=cells2[i].c;
-    if(cells2[i].r<minR) minR=cells2[i].r;
-    if(cells2[i].r>maxR) maxR=cells2[i].r;
+    if(cells2[i].c<minC) minC=cells2[i].c; if(cells2[i].c>maxC) maxC=cells2[i].c;
+    if(cells2[i].r<minR) minR=cells2[i].r; if(cells2[i].r>maxR) maxR=cells2[i].r;
   }
   return {minC:minC, maxC:maxC, minR:minR, maxR:maxR, w:maxC-minC+1, h:maxR-minR+1};
 }
@@ -259,7 +280,6 @@ function render(){
 
   var pal = getBgPalette();
 
-  // Sky background
   if(nightMode){
     var sky=gctx.createLinearGradient(0,0,0,ch);
     sky.addColorStop(0, pal[5]||shadeC(pal[0],0.28));
@@ -271,14 +291,13 @@ function render(){
     gctx.fillStyle=sky2; gctx.fillRect(0,0,cw,ch);
   }
 
-  // Painter's order
   var tileList=[];
   for(var r2=0;r2<ROWS;r2++){
     for(var c2=0;c2<COLS;c2++) tileList.push([c2,r2]);
   }
   tileList.sort(function(a,b){ return (a[0]+a[1])-(b[0]+b[1]); });
 
-  // ── Pass 1: 全タイルの地面 ───────────────────────────────────
+  // ── Pass 1: 地面 ─────────────────────────────────────────────
   tileList.forEach(function(cr){
     var c=cr[0], r=cr[1];
     var s=cellToScreen(c,r);
@@ -288,21 +307,16 @@ function render(){
     drawDiamond(gctx, s.x, s.y, gfill, gstroke, 0.5);
   });
 
-  // ── Pass 2: 全ブロックを通常の1×1で描画 ─────────────────────
-  // ※ グループもここでは個別描画。視覚的な「くっつき」は
-  //    カスタム画像を用意したときに差し替え可能にする設計。
+  // ── Pass 2: ブロック ─────────────────────────────────────────
   tileList.forEach(function(cr){
     var c=cr[0], r=cr[1];
-    var cell=getCell(c,r);
-    if(!cell) return;
+    var cell=getCell(c,r); if(!cell) return;
     var s=cellToScreen(c,r);
     var scale=getBlockScale(c,r);
     if(scale !== 1){
       var cx2=s.x, cy2=s.y+HH*zoom;
       gctx.save();
-      gctx.translate(cx2,cy2);
-      gctx.scale(scale,scale);
-      gctx.translate(-cx2,-cy2);
+      gctx.translate(cx2,cy2); gctx.scale(scale,scale); gctx.translate(-cx2,-cy2);
       drawBlock(gctx,c,r,s.x,s.y,cell.id,cell.dir);
       gctx.restore();
     } else {
@@ -310,59 +324,78 @@ function render(){
     }
   });
 
-  // ── Pass 3: グループ枠 + サイズラベル ────────────────────────
-  // 軽量化のため：グループの描画済みフラグを1回だけ処理
+  // ── Pass 3: グループ枠・サイズラベル ─────────────────────────
   if(typeof groupMap !== 'undefined'){
-    var drawnGids = {};
+    var drawnGids={};
     tileList.forEach(function(cr){
       var c=cr[0], r=cr[1];
-      var cell=getCell(c,r);
-      if(!cell || !cell.gid) return;
+      var cell=getCell(c,r); if(!cell||!cell.gid) return;
       if(drawnGids[cell.gid]) return;
-      drawnGids[cell.gid] = true;
-      var grp = groupMap[cell.gid];
-      if(!grp || grp.cells.length < 2) return;
+      drawnGids[cell.gid]=true;
+      var grp=groupMap[cell.gid]; if(!grp||grp.cells.length<2) return;
 
-      var bbox = groupBBox(grp.cells);
-
-      // グループ内の全セルにゴールド枠を描く
       grp.cells.forEach(function(pos){
-        var s = cellToScreen(pos.c, pos.r);
-        drawDiamond(gctx, s.x, s.y, null, 'rgba(245,200,66,0.80)', 2.0);
+        var s=cellToScreen(pos.c,pos.r);
+        drawDiamond(gctx,s.x,s.y,null,'rgba(245,200,66,0.80)',2.0);
       });
 
-      // サイズラベル（グループ最前面セルの上部）
-      var frontC = bbox.minC + bbox.w - 1;
-      var frontR = bbox.minR + bbox.h - 1;
-      var frontS = cellToScreen(frontC, frontR);
-      var bh = BLOCKS[grp.id] ? BLOCKS[grp.id].bh : 30;
-      var labelX = frontS.x;
-      var labelY = frontS.y - bh * zoom - 4 * zoom;
-      var fs  = Math.max(9, Math.min(15, zoom * 11));
-      var lbl = bbox.w + '×' + bbox.h;
+      var bbox=groupBBox(grp.cells);
+      var frontS=cellToScreen(bbox.minC+bbox.w-1,bbox.minR+bbox.h-1);
+      var bh=BLOCKS[grp.id]?BLOCKS[grp.id].bh:30;
+      var labelX=frontS.x, labelY=frontS.y-bh*zoom-4*zoom;
+      var fs=Math.max(9,Math.min(15,zoom*11));
+      var lbl=bbox.w+'×'+bbox.h;
       gctx.save();
-      gctx.font = 'bold ' + fs + 'px sans-serif';
-      gctx.textAlign = 'center';
-      gctx.textBaseline = 'bottom';
-      var tw = gctx.measureText(lbl).width;
-      gctx.fillStyle = 'rgba(0,0,0,0.70)';
-      gctx.fillRect(labelX-tw/2-3, labelY-fs-2, tw+6, fs+4);
-      gctx.fillStyle = '#f5c842';
-      gctx.fillText(lbl, labelX, labelY);
+      gctx.font='bold '+fs+'px sans-serif'; gctx.textAlign='center'; gctx.textBaseline='bottom';
+      var tw=gctx.measureText(lbl).width;
+      gctx.fillStyle='rgba(0,0,0,0.70)'; gctx.fillRect(labelX-tw/2-3,labelY-fs-2,tw+6,fs+4);
+      gctx.fillStyle='#f5c842'; gctx.fillText(lbl,labelX,labelY);
       gctx.restore();
+    });
+  }
+
+  // ── Pass 4: ドラッグフラッシュ（バイブ代替ビジュアル）────────
+  var hasFlash = Object.keys(dragFlashAnims).length > 0;
+  if(hasFlash){
+    tileList.forEach(function(cr){
+      var c=cr[0], r=cr[1];
+      var flash = _getDragFlash(c,r);
+      if(flash <= 0) return;
+      var s=cellToScreen(c,r);
+      // ゴールドの強い輝き（鐘形フェード）
+      var alpha = flash * 0.70;
+      drawDiamond(gctx, s.x, s.y, 'rgba(255,220,60,'+alpha+')', 'rgba(255,255,255,'+(flash*0.9)+')', 2.5);
+    });
+  }
+
+  // ── Pass 5: ドラッグ中ハイライト（移動先を常時点灯）────────
+  if(typeof dragHighlightKey !== 'undefined' && dragHighlightKey){
+    var dhParts=dragHighlightKey.split(',');
+    var dhC=parseInt(dhParts[0]), dhR=parseInt(dhParts[1]);
+    var dhCell=getCell(dhC,dhR);
+    var dhKeys=[];
+    if(dhCell&&dhCell.gid&&typeof groupMap!=='undefined'&&groupMap[dhCell.gid]){
+      groupMap[dhCell.gid].cells.forEach(function(pos){ dhKeys.push({c:pos.c,r:pos.r}); });
+    } else {
+      dhKeys.push({c:dhC,r:dhR});
+    }
+    dhKeys.forEach(function(pos){
+      var s=cellToScreen(pos.c,pos.r);
+      drawDiamond(gctx,s.x,s.y,'rgba(255,200,50,0.22)','rgba(255,200,50,0.85)',2.2);
     });
   }
 
   // Hover highlight
   if(hoverC>=0 && hoverR>=0 && inGrid(hoverC,hoverR)){
     var hs=cellToScreen(hoverC,hoverR);
-    drawDiamond(gctx, hs.x, hs.y, 'rgba(245,200,66,0.18)', 'rgba(245,200,66,0.7)', 1.5);
+    drawDiamond(gctx,hs.x,hs.y,'rgba(245,200,66,0.18)','rgba(245,200,66,0.7)',1.5);
   }
 
   dirty=false;
-  if(Object.keys(blockAnims).length > 0){
-    requestAnimationFrame(render);
-  }
+
+  // アニメーション継続チェック
+  var needLoop = Object.keys(blockAnims).length > 0 || Object.keys(dragFlashAnims).length > 0;
+  if(needLoop) requestAnimationFrame(render);
 }
 
 function scheduleRender(){
@@ -383,9 +416,7 @@ function drawGeneric(ctx, x, y, id, dir, b){
   var hh=HH*zoom;
   var fs=Math.max(8,Math.min(22,zoom*18));
   ctx.save();
-  ctx.font=fs+'px serif';
-  ctx.textAlign='center';
-  ctx.textBaseline='middle';
+  ctx.font=fs+'px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText(b.icon||'?', x, y-bh*zoom+hh*0.5);
   ctx.restore();
 }
