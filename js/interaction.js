@@ -20,8 +20,7 @@ var dragMoveMode   = false;
 var DRAG_THRESHOLD = 8;
 
 // ── Drag flash state（iso-engine.js側で参照）─────────────────────
-// ドラッグ中のセルキーを公開する。iso-engineがこれを見てハイライト描画する
-var dragHighlightKey = null;   // "c,r" or null
+var dragHighlightKey = null;
 
 // ── Pinch ─────────────────────────────────────────────────────────
 var isPinching = false;
@@ -168,22 +167,17 @@ function floodFill(c,r){
 
 // ── Drag Move helpers ─────────────────────────────────────────────
 function _startDragMove(k, clientX, clientY){
-  dragMoveKey    = k;
-  dragMoveOrigin = {x:clientX, y:clientY};
-  dragMoveMode   = false;
-  dragHighlightKey = k;
-  scheduleRender();
+  dragMoveKey=k; dragMoveOrigin={x:clientX,y:clientY}; dragMoveMode=false;
+  dragHighlightKey=k; scheduleRender();
 }
 
-function _doDragMove(toC, toR){
+function _doDragMove(toC,toR){
   if(!dragMoveKey) return;
   var srcParts=dragMoveKey.split(',');
-  var srcC=parseInt(srcParts[0]), srcR=parseInt(srcParts[1]);
+  var srcC=parseInt(srcParts[0]),srcR=parseInt(srcParts[1]);
   if(toC===srcC&&toR===srcR) return;
-
   var srcCell=getCell(srcC,srcR); if(!srcCell) return;
   var dc=toC-srcC, dr=toR-srcR;
-
   var moveCells=[];
   var gid=srcCell.gid;
   if(gid&&groupMap[gid]){
@@ -191,7 +185,6 @@ function _doDragMove(toC, toR){
   } else {
     moveCells=[{c:srcC,r:srcR}];
   }
-
   for(var i=0;i<moveCells.length;i++){
     if(!inGrid(moveCells[i].c+dc,moveCells[i].r+dr)) return;
   }
@@ -201,18 +194,13 @@ function _doDragMove(toC, toR){
     var dstK=ck(moveCells[i].c+dc,moveCells[i].r+dr);
     if(!srcKeys[dstK]&&cells[dstK]) return;
   }
-
   var moved=moveCells.map(function(p){
-    var k=ck(p.c,p.r), cell=cells[k]; delete cells[k];
+    var k=ck(p.c,p.r),cell=cells[k]; delete cells[k];
     return {c:p.c,r:p.r,cell:cell};
   });
   if(gid&&groupMap[gid]) delete groupMap[gid];
-
-  moved.forEach(function(m){
-    cells[ck(m.c+dc,m.r+dr)]={id:m.cell.id,dir:m.cell.dir||'none'};
-  });
+  moved.forEach(function(m){cells[ck(m.c+dc,m.r+dr)]={id:m.cell.id,dir:m.cell.dir||'none'};});
   moved.forEach(function(m){recomputeGroups(m.c+dc,m.r+dr);});
-
   dragMoveKey=ck(srcC+dc,srcR+dr);
   dragHighlightKey=dragMoveKey;
   scheduleRender();
@@ -223,7 +211,7 @@ function _endDragMove(){
   dragHighlightKey=null;
 }
 
-// ── Sound ─────────────────────────────────────────────────────────
+// ── Audio Context ─────────────────────────────────────────────────
 var _audioCtx=null, _didPlace=false, _placeCount=0;
 
 function _getAudioCtx(){
@@ -232,6 +220,7 @@ function _getAudioCtx(){
   return _audioCtx;
 }
 
+// ── ブロック配置音 ────────────────────────────────────────────────
 function _mcPlaceSound(pitchMult){
   if(!soundOn) return;
   var ctx=_getAudioCtx(); if(!ctx) return;
@@ -254,7 +243,7 @@ function _mcPlaceSound(pitchMult){
   }catch(e){}
 }
 
-// ── 長押し成功音：低音「ドン」+ 高音チャイム ──────────────────────
+// ── 長押し成功音：低音ドン → 中音ふわ → 高音キラン（各0.35秒間隔）
 function _playLongPressSound(){
   if(!soundOn) return;
   var ctx=_getAudioCtx(); if(!ctx) return;
@@ -262,34 +251,36 @@ function _playLongPressSound(){
     var t=ctx.currentTime;
     var out=ctx.createGain(); out.gain.setValueAtTime(1.0,t); out.connect(ctx.destination);
 
-    // 低音ドン（バイブ代替）
+    // ─ 1段目：低音「ドン」t=0.00 ─────────────────────────────
     var o1=ctx.createOscillator(); o1.type='sine';
-    o1.frequency.setValueAtTime(90,t);
-    o1.frequency.exponentialRampToValueAtTime(45,t+0.18);
+    o1.frequency.setValueAtTime(80,t);
+    o1.frequency.exponentialRampToValueAtTime(40,t+0.25);
     var g1=ctx.createGain();
     g1.gain.setValueAtTime(0,t);
-    g1.gain.linearRampToValueAtTime(0.55,t+0.01);
-    g1.gain.exponentialRampToValueAtTime(0.001,t+0.22);
-    o1.connect(g1); g1.connect(out); o1.start(t); o1.stop(t+0.22);
+    g1.gain.linearRampToValueAtTime(0.60,t+0.02);   // 素早くアタック
+    g1.gain.exponentialRampToValueAtTime(0.001,t+0.28);
+    o1.connect(g1); g1.connect(out); o1.start(t); o1.stop(t+0.30);
 
-    // 中音アタック（持ち上げ感）
+    // ─ 2段目：中音「ふわ」t=0.35 ─────────────────────────────
     var o2=ctx.createOscillator(); o2.type='triangle';
-    o2.frequency.setValueAtTime(320,t+0.04);
-    o2.frequency.exponentialRampToValueAtTime(480,t+0.14);
+    o2.frequency.setValueAtTime(280,t+0.35);
+    o2.frequency.linearRampToValueAtTime(420,t+0.55);
     var g2=ctx.createGain();
-    g2.gain.setValueAtTime(0,t+0.04);
-    g2.gain.linearRampToValueAtTime(0.18,t+0.07);
-    g2.gain.exponentialRampToValueAtTime(0.001,t+0.22);
-    o2.connect(g2); g2.connect(out); o2.start(t+0.04); o2.stop(t+0.22);
+    g2.gain.setValueAtTime(0,t+0.35);
+    g2.gain.linearRampToValueAtTime(0.22,t+0.40);
+    g2.gain.exponentialRampToValueAtTime(0.001,t+0.62);
+    o2.connect(g2); g2.connect(out); o2.start(t+0.35); o2.stop(t+0.65);
 
-    // 高音キラン（掴んだ感）
+    // ─ 3段目：高音「キラン」t=0.70 ───────────────────────────
     var o3=ctx.createOscillator(); o3.type='sine';
-    o3.frequency.setValueAtTime(1200,t+0.10);
+    o3.frequency.setValueAtTime(1400,t+0.70);
+    o3.frequency.exponentialRampToValueAtTime(1800,t+0.80);
     var g3=ctx.createGain();
-    g3.gain.setValueAtTime(0,t+0.10);
-    g3.gain.linearRampToValueAtTime(0.10,t+0.12);
-    g3.gain.exponentialRampToValueAtTime(0.001,t+0.28);
-    o3.connect(g3); g3.connect(out); o3.start(t+0.10); o3.stop(t+0.28);
+    g3.gain.setValueAtTime(0,t+0.70);
+    g3.gain.linearRampToValueAtTime(0.14,t+0.73);
+    g3.gain.exponentialRampToValueAtTime(0.001,t+0.95);
+    o3.connect(g3); g3.connect(out); o3.start(t+0.70); o3.stop(t+0.98);
+
   }catch(e){}
 }
 
@@ -300,17 +291,10 @@ function _playDropSound(){
   try{
     var t=ctx.currentTime;
     var out=ctx.createGain(); out.gain.setValueAtTime(1.0,t); out.connect(ctx.destination);
-
-    // コトン（低めの短い衝撃音）
     var o1=ctx.createOscillator(); o1.type='sine';
-    o1.frequency.setValueAtTime(260,t);
-    o1.frequency.exponentialRampToValueAtTime(120,t+0.09);
-    var g1=ctx.createGain();
-    g1.gain.setValueAtTime(0.35,t);
-    g1.gain.exponentialRampToValueAtTime(0.001,t+0.12);
-    o1.connect(g1); g1.connect(out); o1.start(t); o1.stop(t+0.12);
-
-    // ノイズ成分（質感）
+    o1.frequency.setValueAtTime(260,t); o1.frequency.exponentialRampToValueAtTime(120,t+0.09);
+    var g1=ctx.createGain(); g1.gain.setValueAtTime(0.38,t); g1.gain.exponentialRampToValueAtTime(0.001,t+0.13);
+    o1.connect(g1); g1.connect(out); o1.start(t); o1.stop(t+0.14);
     var bufSize=Math.floor(ctx.sampleRate*0.06);
     var buf=ctx.createBuffer(1,bufSize,ctx.sampleRate);
     var data=buf.getChannelData(0);
@@ -344,12 +328,10 @@ function setTool(t2){
     var b=document.getElementById('tool-'+tt); if(b) b.classList.toggle('active',tt===t2);
   });
 }
-
 function updateCursor(){
   if(!gc) return;
   gc.style.cursor=isPanning?'grabbing':(isPanMode?'grab':'crosshair');
 }
-
 function togglePanMode(){
   isPanMode=!isPanMode;
   var btn=document.getElementById('btn-center');
@@ -379,8 +361,7 @@ function initInteraction(){
   document.getElementById('tool-fill').addEventListener('click',  function(){ setTool('fill'); });
   document.getElementById('sel-preview').addEventListener('click',openSheet);
 
-  updateCursor();
-  updateUndoBtns();
+  updateCursor(); updateUndoBtns();
 }
 
 // ── Touch ─────────────────────────────────────────────────────────
@@ -403,14 +384,13 @@ function onTouchStart(e){
   longPressTimer=setTimeout(function(){
     longPressTimer=null;
     if(!getCell(lpC,lpR)) return;
-    // ★ バイブ代替サウンド（低音ドン）
+    // ★ 3段階サウンド（合計約1秒）
     _playLongPressSound();
     if(vibeOn&&navigator.vibrate) navigator.vibrate(30);
-    // ドラッグ準備
     pushUndo();
     _startDragMove(ck(lpC,lpR),touchStartX,touchStartY);
-    // ★ ドラッグ開始フラッシュ
-    triggerDragFlash(lpC,lpR);
+    // ★ フラッシュ開始
+    if(typeof triggerDragFlash==='function') triggerDragFlash(lpC,lpR);
   },480);
 
   isPointerDown=true; touchDrawStarted=false; stampedSet=new Set();
@@ -475,7 +455,6 @@ function onTouchEnd(e){
 
   if(dragMoveKey){
     if(dragMoveMode){
-      // ★ ドロップ音（コトン）
       _playDropSound();
       if(vibeOn&&navigator.vibrate) navigator.vibrate(18);
     } else {
@@ -516,7 +495,7 @@ function onMouseDown(e){
       if(vibeOn&&navigator.vibrate) navigator.vibrate(30);
       pushUndo();
       _startDragMove(ck(cell.c,cell.r),e.clientX,e.clientY);
-      triggerDragFlash(cell.c,cell.r);
+      if(typeof triggerDragFlash==='function') triggerDragFlash(cell.c,cell.r);
     },480);
   }
   handleDraw(cell.c,cell.r);
@@ -538,6 +517,7 @@ function onWindowMouseMove(e){
   }
   var rect=gc.getBoundingClientRect();
   var inside=e.clientX>=rect.left&&e.clientX<=rect.right&&e.clientY>=rect.top&&e.clientY<=rect.bottom;
+
   if(dragMoveKey){
     var dx=e.clientX-dragMoveOrigin.x,dy=e.clientY-dragMoveOrigin.y;
     if(!dragMoveMode&&Math.sqrt(dx*dx+dy*dy)>DRAG_THRESHOLD){
@@ -550,6 +530,7 @@ function onWindowMouseMove(e){
     }
     scheduleRender(); return;
   }
+
   if(!inside){
     if(hoverC>=0){hoverC=-1;hoverR=-1;scheduleRender();}
     if(isPointerDown){commitStamp();isPointerDown=false;}
