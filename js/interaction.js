@@ -261,7 +261,15 @@ function onTouchEnd(e){
   if(isPinching){if(e.touches.length<2){isPinching=false;isPointerDown=false;touchDrawStarted=false;hoverC=-1;hoverR=-1;scheduleRender();}return;}
   cancelLongPress();if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;}
   if(dragMoveKey){
-    if(dragMoveMode){_playDropSound();if(vibeOn&&navigator.vibrate)navigator.vibrate(18);}
+    if(dragMoveMode){
+      _playDropSound();if(vibeOn&&navigator.vibrate)navigator.vibrate(18);
+      // ドロップ後フィードバック（ふわっと上に消える）
+      var _dk=dragMoveKey.split(','),_dc=parseInt(_dk[0]),_dr=parseInt(_dk[1]);
+      if(typeof triggerDropFeedback==='function'){
+        if(dragTargetValid) triggerDropFeedback('OK!',_dc,_dr,'#50ff70');
+        else triggerDropFeedback('✕',_dc,_dr,'#ff5555');
+      }
+    }
     else{if(undoStack.length)undoStack.pop();updateUndoBtns();var parts=dragMoveKey.split(',');openCtxMenu(parseInt(parts[0]),parseInt(parts[1]),touchStartX,touchStartY);}
     _endDragMove();isPointerDown=false;touchDrawStarted=false;stampMode=false;_placeCount=0;hoverC=-1;hoverR=-1;scheduleRender();return;
   }
@@ -297,7 +305,14 @@ function onWindowMouseUp(e){
   cancelLongPress();if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;}stampMode=false;
   if(isPanning){isPanning=false;updateCursor();return;}
   if(dragMoveKey){
-    if(dragMoveMode){_playDropSound();if(vibeOn&&navigator.vibrate)navigator.vibrate(18);}
+    if(dragMoveMode){
+      _playDropSound();if(vibeOn&&navigator.vibrate)navigator.vibrate(18);
+      var _mk=dragMoveKey.split(','),_mc=parseInt(_mk[0]),_mr=parseInt(_mk[1]);
+      if(typeof triggerDropFeedback==='function'){
+        if(dragTargetValid) triggerDropFeedback('OK!',_mc,_mr,'#50ff70');
+        else triggerDropFeedback('✕',_mc,_mr,'#ff5555');
+      }
+    }
     else{if(undoStack.length)undoStack.pop();updateUndoBtns();var parts=dragMoveKey.split(',');var c=parseInt(parts[0]),r=parseInt(parts[1]);if(getCell(c,r))openCtxMenu(c,r,e.clientX,e.clientY);}
     _endDragMove();isPointerDown=false;return;
   }
