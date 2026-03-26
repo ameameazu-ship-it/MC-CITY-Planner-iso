@@ -16,7 +16,7 @@ function getBlockScale(c,r){var key=ck(c,r);if(!blockAnims[key])return 1;var e=p
 // 長押し成功時：ブロックが少し下に沈んでから戻る（ゆっくり沈んで素早く戻る）
 var sinkAnims={};        // ck -> startTime
 var SINK_DURATION=450;   // ms
-var SINK_DEPTH=0.65;      // セル高さに対する沈み込み量（約10px@zoom1.1）
+var SINK_DEPTH=0.65;     // セル高さに対する沈み込み量（約10px@zoom1.1）
 
 function triggerSinkAnim(c,r){
   var cell=getCell(c,r);if(!cell)return;
@@ -213,8 +213,58 @@ function _renderNow(){
     });
   }
 
-  // Pass 5: ドラッグ中ハイライト
-  if(typeof dragHighlightKey!=='undefined'&&dragHighlightKey){
+  // ── Pass 5: ドラッグ移動先の可否表示 ─────────────────────────
+  if(typeof dragMoveMode!=='undefined' && dragMoveMode &&
+     typeof dragTargetCells!=='undefined' && dragTargetCells.length > 0){
+
+    var isValid = (typeof dragTargetValid!=='undefined') && dragTargetValid;
+
+    if(isValid){
+      // ── 移動OK：緑 + 「OK!」────────────────────────────────
+      dragTargetCells.forEach(function(pos){
+        var s=cellToScreen(pos.c,pos.r);
+        drawDiamond(gctx,s.x,s.y,'rgba(60,220,80,0.35)','rgba(60,220,80,0.90)',2.5);
+      });
+      // ラベルをグループ中央に表示
+      var mc2=dragTargetCells.reduce(function(s,p){return{c:s.c+p.c,r:s.r+p.r};},{c:0,r:0});
+      var cx3=mc2.c/dragTargetCells.length, cr3=mc2.r/dragTargetCells.length;
+      var cs=cellToScreen(cx3,cr3);
+      var fs3=Math.max(13,Math.min(22,zoom*17));
+      gctx.save();
+      gctx.font='bold '+fs3+'px sans-serif';
+      gctx.textAlign='center'; gctx.textBaseline='middle';
+      var lbl3='OK!';
+      var tw3=gctx.measureText(lbl3).width;
+      gctx.fillStyle='rgba(0,0,0,0.65)';
+      gctx.beginPath();gctx.roundRect(cs.x-tw3/2-8,cs.y-fs3/2-5,tw3+16,fs3+10,6);gctx.fill();
+      gctx.fillStyle='#50ff70';
+      gctx.fillText(lbl3,cs.x,cs.y);
+      gctx.restore();
+
+    } else {
+      // ── 移動NG：赤 + 「×」──────────────────────────────────
+      dragTargetCells.forEach(function(pos){
+        if(!inGrid(pos.c,pos.r)) return;
+        var s=cellToScreen(pos.c,pos.r);
+        drawDiamond(gctx,s.x,s.y,'rgba(255,50,50,0.35)','rgba(255,50,50,0.90)',2.5);
+      });
+      // ×マーク：ホバー位置に表示
+      var hs2=cellToScreen(hoverC>=0?hoverC:dragTargetCells[0].c, hoverR>=0?hoverR:dragTargetCells[0].r);
+      var fs4=Math.max(16,Math.min(28,zoom*22));
+      gctx.save();
+      gctx.font='bold '+fs4+'px sans-serif';
+      gctx.textAlign='center'; gctx.textBaseline='middle';
+      var lbl4='✕';
+      var tw4=gctx.measureText(lbl4).width;
+      gctx.fillStyle='rgba(0,0,0,0.65)';
+      gctx.beginPath();gctx.roundRect(hs2.x-tw4/2-8,hs2.y-fs4/2-5,tw4+16,fs4+10,6);gctx.fill();
+      gctx.fillStyle='#ff4444';
+      gctx.fillText(lbl4,hs2.x,hs2.y);
+      gctx.restore();
+    }
+
+  } else if(typeof dragHighlightKey!=='undefined'&&dragHighlightKey&&!(typeof dragMoveMode!=='undefined'&&dragMoveMode)){
+    // ドラッグ準備中（まだ動かしていない）：オレンジハイライト
     var dp=dragHighlightKey.split(','),dhC=parseInt(dp[0]),dhR=parseInt(dp[1]);
     var dhCell=getCell(dhC,dhR),dhKeys=[];
     if(dhCell&&dhCell.gid&&typeof groupMap!=='undefined'&&groupMap[dhCell.gid])groupMap[dhCell.gid].cells.forEach(function(p){dhKeys.push({c:p.c,r:p.r});});
