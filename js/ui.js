@@ -22,7 +22,10 @@ var I18N = {
     s_sound:'🔊 配置音',     s_sound_desc:'ブロック配置時の効果音',
     s_vibe:'📳 バイブ',      s_vibe_desc:'タップ時の振動フィードバック',
     s_grid:'⊞ グリッド',    s_grid_desc:'グリッド線の表示',
-    s_lang:'🌐 言語',        s_lang_desc:'表示言語を選択'
+    s_lang:'🌐 言語',        s_lang_desc:'表示言語を選択',
+    s_bg:'🎨 背景色',        s_bg_desc:'マップの背景色',
+    bg_default:'ブラック', bg_grass:'グリーン', bg_desert:'サンド',
+    bg_snow:'スノー', bg_ocean:'オーシャン', bg_stone:'ストーン'
   },
   en:{
     draw:'Draw', erase:'Erase', fill:'Fill', list:'List',
@@ -37,7 +40,10 @@ var I18N = {
     s_sound:'🔊 Sound',       s_sound_desc:'Sound effect on block placement',
     s_vibe:'📳 Vibrate',      s_vibe_desc:'Haptic feedback on tap',
     s_grid:'⊞ Grid',         s_grid_desc:'Show grid lines',
-    s_lang:'🌐 Language',     s_lang_desc:'Select display language'
+    s_lang:'🌐 Language',     s_lang_desc:'Select display language',
+    s_bg:'🎨 Background',     s_bg_desc:'Map background color',
+    bg_default:'Black', bg_grass:'Green', bg_desert:'Sand',
+    bg_snow:'Snow', bg_ocean:'Ocean', bg_stone:'Stone'
   },
   zh:{
     draw:'绘制', erase:'删除', fill:'填充', list:'列表',
@@ -52,7 +58,10 @@ var I18N = {
     s_sound:'🔊 音效',       s_sound_desc:'放置方块时的音效',
     s_vibe:'📳 振动',        s_vibe_desc:'点按时的触觉反馈',
     s_grid:'⊞ 网格',        s_grid_desc:'显示网格线',
-    s_lang:'🌐 语言',        s_lang_desc:'选择显示语言'
+    s_lang:'🌐 语言',        s_lang_desc:'选择显示语言',
+    s_bg:'🎨 背景色',        s_bg_desc:'地图背景颜色',
+    bg_default:'黑色', bg_grass:'绿色', bg_desert:'沙漠',
+    bg_snow:'雪地', bg_ocean:'海洋', bg_stone:'石头'
   },
   ko:{
     draw:'그리기', erase:'지우기', fill:'채우기', list:'목록',
@@ -67,7 +76,10 @@ var I18N = {
     s_sound:'🔊 효과음',     s_sound_desc:'블록 배치 시 효과음',
     s_vibe:'📳 진동',        s_vibe_desc:'탭 시 진동 피드백',
     s_grid:'⊞ 그리드',      s_grid_desc:'그리드 선 표시',
-    s_lang:'🌐 언어',        s_lang_desc:'표시 언어 선택'
+    s_lang:'🌐 언어',        s_lang_desc:'표시 언어 선택',
+    s_bg:'🎨 배경색',        s_bg_desc:'맵 배경 색상',
+    bg_default:'블랙', bg_grass:'그린', bg_desert:'샌드',
+    bg_snow:'스노우', bg_ocean:'오션', bg_stone:'스톤'
   },
   es:{
     draw:'Dibujar', erase:'Borrar', fill:'Rellenar', list:'Lista',
@@ -82,7 +94,10 @@ var I18N = {
     s_sound:'🔊 Sonido',      s_sound_desc:'Efecto al colocar bloques',
     s_vibe:'📳 Vibración',    s_vibe_desc:'Vibración táctil al tocar',
     s_grid:'⊞ Cuadrícula',   s_grid_desc:'Mostrar líneas de cuadrícula',
-    s_lang:'🌐 Idioma',       s_lang_desc:'Seleccionar idioma'
+    s_lang:'🌐 Idioma',       s_lang_desc:'Seleccionar idioma',
+    s_bg:'🎨 Fondo',          s_bg_desc:'Color de fondo del mapa',
+    bg_default:'Negro', bg_grass:'Verde', bg_desert:'Arena',
+    bg_snow:'Nieve', bg_ocean:'Océano', bg_stone:'Piedra'
   },
   fr:{
     draw:'Dessiner', erase:'Effacer', fill:'Remplir', list:'Liste',
@@ -97,7 +112,10 @@ var I18N = {
     s_sound:'🔊 Son',          s_sound_desc:'Effet sonore lors du placement',
     s_vibe:'📳 Vibration',     s_vibe_desc:'Retour haptique au toucher',
     s_grid:'⊞ Grille',        s_grid_desc:'Afficher les lignes de grille',
-    s_lang:'🌐 Langue',        s_lang_desc:'Sélectionner la langue'
+    s_lang:'🌐 Langue',        s_lang_desc:'Sélectionner la langue',
+    s_bg:'🎨 Fond',            s_bg_desc:'Couleur de fond de la carte',
+    bg_default:'Noir', bg_grass:'Vert', bg_desert:'Sable',
+    bg_snow:'Neige', bg_ocean:'Océan', bg_stone:'Pierre'
   },
   id:{
     draw:'Gambar', erase:'Hapus', fill:'Isi', list:'Daftar',
@@ -112,7 +130,10 @@ var I18N = {
     s_sound:'🔊 Suara',        s_sound_desc:'Efek suara saat meletakkan blok',
     s_vibe:'📳 Getar',         s_vibe_desc:'Umpan balik getar saat mengetuk',
     s_grid:'⊞ Kisi',          s_grid_desc:'Tampilkan garis kisi',
-    s_lang:'🌐 Bahasa',        s_lang_desc:'Pilih bahasa tampilan'
+    s_lang:'🌐 Bahasa',        s_lang_desc:'Pilih bahasa tampilan',
+    s_bg:'🎨 Latar',           s_bg_desc:'Warna latar peta',
+    bg_default:'Hitam', bg_grass:'Hijau', bg_desert:'Pasir',
+    bg_snow:'Salju', bg_ocean:'Samudra', bg_stone:'Batu'
   },
   hi:{
     draw:'बनाएं', erase:'मिटाएं', fill:'भरें', list:'सूची',
@@ -127,7 +148,10 @@ var I18N = {
     s_sound:'🔊 ध्वनि',        s_sound_desc:'ब्लॉक रखने पर ध्वनि प्रभाव',
     s_vibe:'📳 कंपन',          s_vibe_desc:'टैप पर कंपन प्रतिक्रिया',
     s_grid:'⊞ ग्रिड',         s_grid_desc:'ग्रिड रेखाएं दिखाएं',
-    s_lang:'🌐 भाषा',          s_lang_desc:'प्रदर्शन भाषा चुनें'
+    s_lang:'🌐 भाषा',          s_lang_desc:'प्रदर्शन भाषा चुनें',
+    s_bg:'🎨 पृष्ठभूमि',       s_bg_desc:'मानचित्र पृष्ठभूमि रंग',
+    bg_default:'काला', bg_grass:'हरा', bg_desert:'रेत',
+    bg_snow:'बर्फ', bg_ocean:'समुद्र', bg_stone:'पत्थर'
   }
 };
 
@@ -153,6 +177,15 @@ function applyLang(newLang){
   setText('lbl-s-vibe',   t('s_vibe'));        setText('desc-s-vibe',   t('s_vibe_desc'));
   setText('lbl-s-grid',   t('s_grid'));        setText('desc-s-grid',   t('s_grid_desc'));
   setText('lbl-s-lang',   t('s_lang'));        setText('desc-s-lang',   t('s_lang_desc'));
+  setText('lbl-s-bg',     t('s_bg'));
+  // 背景色swatchのtitleを言語に合わせて更新
+  ['default','grass','desert','snow','ocean','stone'].forEach(function(k){
+    var btn=document.getElementById('bg-'+k);
+    if(btn) btn.title=t('bg_'+k);
+  });
+  // desc-s-bg は現在選択中のテーマ名を表示
+  var descBg=document.getElementById('desc-s-bg');
+  if(descBg) descBg.textContent=t('s_bg_desc')+'（'+t('bg_'+bgTheme)+'）';
   var ph = document.getElementById('field-name-input'); if(ph) ph.placeholder = t('save_ph');
   setText('settings-save',  t('save'));
   setText('settings-clear', t('clear'));
@@ -372,7 +405,8 @@ function initUI(){
     if(typeof clearAllCells === 'function'){
       clearAllCells();
     } else {
-      cells = {};
+      if(typeof clearAllCells==='function') clearAllCells();
+      else cells={};
     }
     closeSettings();
     scheduleRender();
@@ -383,6 +417,20 @@ function initUI(){
   bindToggle('settings-sound', function(v){ soundOn = v; });
   bindToggle('settings-vibe',  function(v){ vibeOn  = v; });
   bindToggle('settings-grid',  function(v){ showGrid = v; scheduleRender(); });
+
+  // ★ 背景色スウォッチ
+  document.querySelectorAll('.bg-swatch').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      bgTheme = btn.dataset.bg;
+      // active クラスを付け替え
+      document.querySelectorAll('.bg-swatch').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      // desc を現在のテーマ名に更新
+      var descBg = document.getElementById('desc-s-bg');
+      if(descBg) descBg.textContent = t('s_bg_desc')+'（'+t('bg_'+bgTheme)+'）';
+      scheduleRender();
+    });
+  });
 
   document.querySelectorAll('.ctx-dir-btn').forEach(function(btn){
     btn.addEventListener('click', function(){ setDir(btn.dataset.dir); });
