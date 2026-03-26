@@ -158,10 +158,21 @@ function _renderNow(){
   });
 
   // ── Pass 3: グループ化アニメ（合体した瞬間だけラベル表示）────
-  // 常時の枠・ラベルは表示しない。合体時のみふわっと表示して消える。
+  // ドラッグ中のグループはスキップ
   var now3=performance.now();
   var activeFlash=false;
+
+  // ドラッグ中のgidを特定
+  var draggingGid=null;
+  if(typeof dragMoveMode!=='undefined'&&dragMoveMode&&typeof dragHighlightKey!=='undefined'&&dragHighlightKey){
+    var dhp=dragHighlightKey.split(',');
+    var dhcell=getCell(parseInt(dhp[0]),parseInt(dhp[1]));
+    if(dhcell&&dhcell.gid) draggingGid=dhcell.gid;
+  }
+
   Object.keys(groupFormedAnims).forEach(function(gid){
+    // ドラッグ中はこのグループのラベルを出さない
+    if(gid===draggingGid) return;
     var anim=groupFormedAnims[gid];
     var elapsed=now3-anim.startTime;
     if(elapsed>=GROUP_FORMED_DURATION){ delete groupFormedAnims[gid]; return; }
@@ -220,47 +231,58 @@ function _renderNow(){
     var isValid = (typeof dragTargetValid!=='undefined') && dragTargetValid;
 
     if(isValid){
-      // ── 移動OK：緑 + 「OK!」────────────────────────────────
+      // ── 移動OK：緑枠 + ブロック上部に「OK!」──────────────
       dragTargetCells.forEach(function(pos){
         var s=cellToScreen(pos.c,pos.r);
         drawDiamond(gctx,s.x,s.y,'rgba(60,220,80,0.35)','rgba(60,220,80,0.90)',2.5);
       });
-      // ラベルをグループ中央に表示
-      var mc2=dragTargetCells.reduce(function(s,p){return{c:s.c+p.c,r:s.r+p.r};},{c:0,r:0});
-      var cx3=mc2.c/dragTargetCells.length, cr3=mc2.r/dragTargetCells.length;
-      var cs=cellToScreen(cx3,cr3);
-      var fs3=Math.max(13,Math.min(22,zoom*17));
-      gctx.save();
-      gctx.font='bold '+fs3+'px sans-serif';
-      gctx.textAlign='center'; gctx.textBaseline='middle';
-      var lbl3='OK!';
-      var tw3=gctx.measureText(lbl3).width;
-      gctx.fillStyle='rgba(0,0,0,0.65)';
-      gctx.fillRect(cs.x-tw3/2-8, cs.y-fs3/2-5, tw3+16, fs3+10);
-      gctx.fillStyle='#50ff70';
-      gctx.fillText(lbl3,cs.x,cs.y);
-      gctx.restore();
+      // ラベルは移動中ブロック（dragHighlightKey）の上部に表示
+      var srcParts2=(typeof dragMoveKey!=='undefined'&&dragMoveKey)?dragMoveKey.split(','):null;
+      if(srcParts2){
+        var srcC2=parseInt(srcParts2[0]),srcR2=parseInt(srcParts2[1]);
+        var srcCell2=getCell(srcC2,srcR2);
+        var srcS2=cellToScreen(srcC2,srcR2);
+        var bh2=srcCell2&&BLOCKS[srcCell2.id]?BLOCKS[srcCell2.id].bh:30;
+        var fs3=Math.max(13,Math.min(22,zoom*17));
+        var lbl3='OK!';
+        gctx.save();
+        gctx.font='bold '+fs3+'px sans-serif';
+        gctx.textAlign='center'; gctx.textBaseline='bottom';
+        var tw3=gctx.measureText(lbl3).width;
+        var lx3=srcS2.x, ly3=srcS2.y-bh2*zoom-6*zoom;
+        gctx.fillStyle='rgba(0,0,0,0.70)';
+        gctx.fillRect(lx3-tw3/2-8, ly3-fs3-3, tw3+16, fs3+8);
+        gctx.fillStyle='#50ff70';
+        gctx.fillText(lbl3, lx3, ly3);
+        gctx.restore();
+      }
 
     } else {
-      // ── 移動NG：赤 + 「×」──────────────────────────────────
+      // ── 移動NG：赤枠 + ブロック上部に「✕」────────────────
       dragTargetCells.forEach(function(pos){
         if(!inGrid(pos.c,pos.r)) return;
         var s=cellToScreen(pos.c,pos.r);
         drawDiamond(gctx,s.x,s.y,'rgba(255,50,50,0.35)','rgba(255,50,50,0.90)',2.5);
       });
-      // ×マーク：ホバー位置に表示
-      var hs2=cellToScreen(hoverC>=0?hoverC:dragTargetCells[0].c, hoverR>=0?hoverR:dragTargetCells[0].r);
-      var fs4=Math.max(16,Math.min(28,zoom*22));
-      gctx.save();
-      gctx.font='bold '+fs4+'px sans-serif';
-      gctx.textAlign='center'; gctx.textBaseline='middle';
-      var lbl4='✕';
-      var tw4=gctx.measureText(lbl4).width;
-      gctx.fillStyle='rgba(0,0,0,0.65)';
-      gctx.fillRect(hs2.x-tw4/2-8, hs2.y-fs4/2-5, tw4+16, fs4+10);
-      gctx.fillStyle='#ff4444';
-      gctx.fillText(lbl4,hs2.x,hs2.y);
-      gctx.restore();
+      var srcParts3=(typeof dragMoveKey!=='undefined'&&dragMoveKey)?dragMoveKey.split(','):null;
+      if(srcParts3){
+        var srcC3=parseInt(srcParts3[0]),srcR3=parseInt(srcParts3[1]);
+        var srcCell3=getCell(srcC3,srcR3);
+        var srcS3=cellToScreen(srcC3,srcR3);
+        var bh3=srcCell3&&BLOCKS[srcCell3.id]?BLOCKS[srcCell3.id].bh:30;
+        var fs4=Math.max(13,Math.min(22,zoom*17));
+        var lbl4='✕';
+        gctx.save();
+        gctx.font='bold '+fs4+'px sans-serif';
+        gctx.textAlign='center'; gctx.textBaseline='bottom';
+        var tw4=gctx.measureText(lbl4).width;
+        var lx4=srcS3.x, ly4=srcS3.y-bh3*zoom-6*zoom;
+        gctx.fillStyle='rgba(0,0,0,0.70)';
+        gctx.fillRect(lx4-tw4/2-8, ly4-fs4-3, tw4+16, fs4+8);
+        gctx.fillStyle='#ff5555';
+        gctx.fillText(lbl4, lx4, ly4);
+        gctx.restore();
+      }
     }
 
   } else if(typeof dragHighlightKey!=='undefined'&&dragHighlightKey&&!(typeof dragMoveMode!=='undefined'&&dragMoveMode)){
