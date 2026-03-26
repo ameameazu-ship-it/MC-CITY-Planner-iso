@@ -45,6 +45,9 @@ function recomputeGroups(c,r){
   if(!best)return;
   Object.keys(bestGids).forEach(function(gid){var grp=groupMap[gid];if(grp){grp.cells.forEach(function(p){var m=getCell(p.c,p.r);if(m)delete m.gid;});delete groupMap[gid];}});
   var ng='g'+(nextGid++);best.forEach(function(p){var m=getCell(p.c,p.r);if(m)m.gid=ng;});groupMap[ng]={cells:best,id:id};
+  // ★ グループ化した瞬間だけラベルをアニメ表示
+  var bbox2={w:best.reduce(function(mx,p){return Math.max(mx,p.c);},best[0].c)-best.reduce(function(mn,p){return Math.min(mn,p.c);},best[0].c)+1,h:best.reduce(function(mx,p){return Math.max(mx,p.r);},best[0].r)-best.reduce(function(mn,p){return Math.min(mn,p.r);},best[0].r)+1};
+  if(typeof triggerGroupFormed==='function') triggerGroupFormed(ng, bbox2.w+'×'+bbox2.h, best);
 }
 function _dissolveGroup(c,r){var mc=getCell(c,r);if(!mc||!mc.gid)return;var grp=groupMap[mc.gid];if(grp){grp.cells.forEach(function(p){var m=getCell(p.c,p.r);if(m)delete m.gid;});delete groupMap[mc.gid];}}
 function clearAllCells(){cells={};groupMap={};nextGid=1;scheduleRender();}
