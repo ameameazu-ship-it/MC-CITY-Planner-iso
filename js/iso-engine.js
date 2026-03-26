@@ -236,7 +236,7 @@ function _renderNow(){
       var lbl3='OK!';
       var tw3=gctx.measureText(lbl3).width;
       gctx.fillStyle='rgba(0,0,0,0.65)';
-      gctx.beginPath();gctx.roundRect(cs.x-tw3/2-8,cs.y-fs3/2-5,tw3+16,fs3+10,6);gctx.fill();
+      gctx.fillRect(cs.x-tw3/2-8, cs.y-fs3/2-5, tw3+16, fs3+10);
       gctx.fillStyle='#50ff70';
       gctx.fillText(lbl3,cs.x,cs.y);
       gctx.restore();
@@ -257,7 +257,7 @@ function _renderNow(){
       var lbl4='✕';
       var tw4=gctx.measureText(lbl4).width;
       gctx.fillStyle='rgba(0,0,0,0.65)';
-      gctx.beginPath();gctx.roundRect(hs2.x-tw4/2-8,hs2.y-fs4/2-5,tw4+16,fs4+10,6);gctx.fill();
+      gctx.fillRect(hs2.x-tw4/2-8, hs2.y-fs4/2-5, tw4+16, fs4+10);
       gctx.fillStyle='#ff4444';
       gctx.fillText(lbl4,hs2.x,hs2.y);
       gctx.restore();
