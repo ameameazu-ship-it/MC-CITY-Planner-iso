@@ -62,6 +62,18 @@ function triggerGroupFormed(gid, label, cells2){
   };
   _startRafLoop();
 }
+// ★ ドロップ可否フィードバック（ふわっと上に消えるアニメ）
+var dropFeedbackAnim=null;
+var DROP_FEEDBACK_DURATION=700;
+
+function triggerDropFeedback(label,c,r,color){
+  var cell=getCell(c,r);
+  var bh=cell&&BLOCKS[cell.id]?BLOCKS[cell.id].bh:30;
+  var s=cellToScreen(c,r);
+  dropFeedbackAnim={label:label,x:s.x,y:s.y-bh*zoom,color:color,startTime:performance.now()};
+  _startRafLoop();
+}
+
 var dragFlashCells=[],dragFlashStart=0,FLASH_DURATION=500,FLASH_PULSES=2;
 function triggerDragFlash(c,r){
   var cell=getCell(c,r);if(!cell)return;
@@ -83,7 +95,7 @@ function _getFlashAlpha(){
 var _rafLoopRunning=false;
 function _startRafLoop(){if(_rafLoopRunning)return;_rafLoopRunning=true;requestAnimationFrame(_rafLoop);}
 function _rafLoop(){
-  var needMore=Object.keys(blockAnims).length>0||Object.keys(sinkAnims).length>0||dragFlashCells.length>0||Object.keys(groupFormedAnims).length>0;
+  var needMore=Object.keys(blockAnims).length>0||Object.keys(sinkAnims).length>0||dragFlashCells.length>0||Object.keys(groupFormedAnims).length>0||dropFeedbackAnim!==null;
   dirty=true;_renderNow();
   if(needMore)requestAnimationFrame(_rafLoop);else _rafLoopRunning=false;
 }
@@ -158,21 +170,14 @@ function _renderNow(){
   });
 
   // ── Pass 3: グループ化アニメ（合体した瞬間だけラベル表示）────
-  // ドラッグ中のグループはスキップ
+  // ドラッグ中（dragMoveKey がある間）は一切表示しない
   var now3=performance.now();
   var activeFlash=false;
+  var isDragging=(typeof dragMoveKey!=='undefined'&&dragMoveKey!==null);
 
-  // ドラッグ中のgidを特定
-  var draggingGid=null;
-  if(typeof dragMoveMode!=='undefined'&&dragMoveMode&&typeof dragHighlightKey!=='undefined'&&dragHighlightKey){
-    var dhp=dragHighlightKey.split(',');
-    var dhcell=getCell(parseInt(dhp[0]),parseInt(dhp[1]));
-    if(dhcell&&dhcell.gid) draggingGid=dhcell.gid;
-  }
-
-  Object.keys(groupFormedAnims).forEach(function(gid){
-    // ドラッグ中はこのグループのラベルを出さない
-    if(gid===draggingGid) return;
+  if(!isDragging){
+    Object.keys(groupFormedAnims).forEach(function(gid){
+      var anim=groupFormedAnims[gid];
     var anim=groupFormedAnims[gid];
     var elapsed=now3-anim.startTime;
     if(elapsed>=GROUP_FORMED_DURATION){ delete groupFormedAnims[gid]; return; }
@@ -212,6 +217,7 @@ function _renderNow(){
     gctx.fillText(anim.label,lx,ly);
     gctx.restore();
   });
+  } // end !isDragging
   if(activeFlash) _startRafLoop();
 
   // Pass 4: ドラッグフラッシュ
@@ -225,66 +231,19 @@ function _renderNow(){
   }
 
   // ── Pass 5: ドラッグ移動先の可否表示 ─────────────────────────
-  if(typeof dragMoveMode!=='undefined' && dragMoveMode &&
-     typeof dragTargetCells!=='undefined' && dragTargetCells.length > 0){
-
-    var isValid = (typeof dragTargetValid!=='undefined') && dragTargetValid;
-
-    if(isValid){
-      // ── 移動OK：緑枠 + ブロック上部に「OK!」──────────────
-      dragTargetCells.forEach(function(pos){
-        var s=cellToScreen(pos.c,pos.r);
-        drawDiamond(gctx,s.x,s.y,'rgba(60,220,80,0.35)','rgba(60,220,80,0.90)',2.5);
-      });
-      // ラベルは移動中ブロック（dragHighlightKey）の上部に表示
-      var srcParts2=(typeof dragMoveKey!=='undefined'&&dragMoveKey)?dragMoveKey.split(','):null;
-      if(srcParts2){
-        var srcC2=parseInt(srcParts2[0]),srcR2=parseInt(srcParts2[1]);
-        var srcCell2=getCell(srcC2,srcR2);
-        var srcS2=cellToScreen(srcC2,srcR2);
-        var bh2=srcCell2&&BLOCKS[srcCell2.id]?BLOCKS[srcCell2.id].bh:30;
-        var fs3=Math.max(13,Math.min(22,zoom*17));
-        var lbl3='OK!';
-        gctx.save();
-        gctx.font='bold '+fs3+'px sans-serif';
-        gctx.textAlign='center'; gctx.textBaseline='bottom';
-        var tw3=gctx.measureText(lbl3).width;
-        var lx3=srcS2.x, ly3=srcS2.y-bh2*zoom-6*zoom;
-        gctx.fillStyle='rgba(0,0,0,0.70)';
-        gctx.fillRect(lx3-tw3/2-8, ly3-fs3-3, tw3+16, fs3+8);
-        gctx.fillStyle='#50ff70';
-        gctx.fillText(lbl3, lx3, ly3);
-        gctx.restore();
+  if(typeof dragMoveMode!=='undefined'&&dragMoveMode&&
+     typeof dragTargetCells!=='undefined'&&dragTargetCells.length>0){
+    var isValid=(typeof dragTargetValid!=='undefined')&&dragTargetValid;
+    // ドラッグ中：色枠のみ（ラベルなし）
+    dragTargetCells.forEach(function(pos){
+      if(!inGrid(pos.c,pos.r)) return;
+      var s=cellToScreen(pos.c,pos.r);
+      if(isValid){
+        drawDiamond(gctx,s.x,s.y,'rgba(60,220,80,0.30)','rgba(60,220,80,0.85)',2.5);
+      } else {
+        drawDiamond(gctx,s.x,s.y,'rgba(255,50,50,0.30)','rgba(255,50,50,0.85)',2.5);
       }
-
-    } else {
-      // ── 移動NG：赤枠 + ブロック上部に「✕」────────────────
-      dragTargetCells.forEach(function(pos){
-        if(!inGrid(pos.c,pos.r)) return;
-        var s=cellToScreen(pos.c,pos.r);
-        drawDiamond(gctx,s.x,s.y,'rgba(255,50,50,0.35)','rgba(255,50,50,0.90)',2.5);
-      });
-      var srcParts3=(typeof dragMoveKey!=='undefined'&&dragMoveKey)?dragMoveKey.split(','):null;
-      if(srcParts3){
-        var srcC3=parseInt(srcParts3[0]),srcR3=parseInt(srcParts3[1]);
-        var srcCell3=getCell(srcC3,srcR3);
-        var srcS3=cellToScreen(srcC3,srcR3);
-        var bh3=srcCell3&&BLOCKS[srcCell3.id]?BLOCKS[srcCell3.id].bh:30;
-        var fs4=Math.max(13,Math.min(22,zoom*17));
-        var lbl4='✕';
-        gctx.save();
-        gctx.font='bold '+fs4+'px sans-serif';
-        gctx.textAlign='center'; gctx.textBaseline='bottom';
-        var tw4=gctx.measureText(lbl4).width;
-        var lx4=srcS3.x, ly4=srcS3.y-bh3*zoom-6*zoom;
-        gctx.fillStyle='rgba(0,0,0,0.70)';
-        gctx.fillRect(lx4-tw4/2-8, ly4-fs4-3, tw4+16, fs4+8);
-        gctx.fillStyle='#ff5555';
-        gctx.fillText(lbl4, lx4, ly4);
-        gctx.restore();
-      }
-    }
-
+    });
   } else if(typeof dragHighlightKey!=='undefined'&&dragHighlightKey&&!(typeof dragMoveMode!=='undefined'&&dragMoveMode)){
     // ドラッグ準備中（まだ動かしていない）：オレンジハイライト
     var dp=dragHighlightKey.split(','),dhC=parseInt(dp[0]),dhR=parseInt(dp[1]);
@@ -292,6 +251,33 @@ function _renderNow(){
     if(dhCell&&dhCell.gid&&typeof groupMap!=='undefined'&&groupMap[dhCell.gid])groupMap[dhCell.gid].cells.forEach(function(p){dhKeys.push({c:p.c,r:p.r});});
     else dhKeys.push({c:dhC,r:dhR});
     dhKeys.forEach(function(pos){var s=cellToScreen(pos.c,pos.r);drawDiamond(gctx,s.x,s.y,'rgba(255,200,50,0.25)','rgba(255,200,50,0.90)',2.2);});
+  }
+
+  // ── Pass 6: ドロップ後フィードバック（ふわっと上に消える）────
+  if(dropFeedbackAnim){
+    var dfa=dropFeedbackAnim;
+    var dfElapsed=performance.now()-dfa.startTime;
+    if(dfElapsed>=DROP_FEEDBACK_DURATION){
+      dropFeedbackAnim=null;
+    } else {
+      var dft=dfElapsed/DROP_FEEDBACK_DURATION;
+      // フェード＋上に浮かぶ：0→0.2で出現、0.2→1.0で消えながら上昇
+      var dfAlpha=dft<0.2?(dft/0.2):(1-(dft-0.2)/0.8);
+      dfAlpha=Math.max(0,dfAlpha);
+      var dfFloatY=-35*zoom*dft;  // 上に35px浮かぶ
+      var dfs=Math.max(14,Math.min(24,zoom*18));
+      gctx.save();
+      gctx.globalAlpha=dfAlpha;
+      gctx.font='bold '+dfs+'px sans-serif';
+      gctx.textAlign='center'; gctx.textBaseline='bottom';
+      var dftw=gctx.measureText(dfa.label).width;
+      var dfx=dfa.x, dfy=dfa.y+dfFloatY;
+      gctx.fillStyle='rgba(0,0,0,0.70)';
+      gctx.fillRect(dfx-dftw/2-8,dfy-dfs-3,dftw+16,dfs+8);
+      gctx.fillStyle=dfa.color;
+      gctx.fillText(dfa.label,dfx,dfy);
+      gctx.restore();
+    }
   }
 
   // Hover
