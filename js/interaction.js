@@ -96,6 +96,7 @@ function _checkDragTarget(toC, toR){
 }
 function _startDragMove(k,cx,cy){dragMoveKey=k;dragMoveOrigin={x:cx,y:cy};dragMoveMode=false;dragHighlightKey=k;dragTargetCells=[];dragTargetValid=false;scheduleRender();}
 
+function _doDragMove(toC,toR){
   if(!dragMoveKey)return;
   var sp=dragMoveKey.split(','),srcC=parseInt(sp[0]),srcR=parseInt(sp[1]);
   if(toC===srcC&&toR===srcR)return;
