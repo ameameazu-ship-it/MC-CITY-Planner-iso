@@ -49,7 +49,19 @@ function getSinkOffset(c,r){
   return offset * HH * zoom;  // ピクセル換算
 }
 
-// ★ ドラッグフラッシュ（ゴールド点滅）
+// ★ グループ化アニメ（合体した瞬間だけ表示）
+var groupFormedAnims={};       // gid -> {startTime, label, cells, id}
+var GROUP_FORMED_DURATION=900; // ms：ラベルが消えるまでの時間
+
+function triggerGroupFormed(gid, label, cells2){
+  groupFormedAnims[gid]={
+    startTime: performance.now(),
+    label: label,
+    cells: cells2.map(function(p){return{c:p.c,r:p.r};}),
+    id: (cells2[0] && getCell(cells2[0].c,cells2[0].r)) ? getCell(cells2[0].c,cells2[0].r).id : ''
+  };
+  _startRafLoop();
+}
 var dragFlashCells=[],dragFlashStart=0,FLASH_DURATION=500,FLASH_PULSES=2;
 function triggerDragFlash(c,r){
   var cell=getCell(c,r);if(!cell)return;
@@ -71,7 +83,7 @@ function _getFlashAlpha(){
 var _rafLoopRunning=false;
 function _startRafLoop(){if(_rafLoopRunning)return;_rafLoopRunning=true;requestAnimationFrame(_rafLoop);}
 function _rafLoop(){
-  var needMore=Object.keys(blockAnims).length>0||Object.keys(sinkAnims).length>0||dragFlashCells.length>0;
+  var needMore=Object.keys(blockAnims).length>0||Object.keys(sinkAnims).length>0||dragFlashCells.length>0||Object.keys(groupFormedAnims).length>0;
   dirty=true;_renderNow();
   if(needMore)requestAnimationFrame(_rafLoop);else _rafLoopRunning=false;
 }
@@ -145,22 +157,51 @@ function _renderNow(){
     }
   });
 
-  // Pass 3: グループ枠・ラベル
-  if(typeof groupMap!=='undefined'){
-    var drawnGids={};
-    tileList.forEach(function(cr){
-      var c=cr[0],r=cr[1],cell=getCell(c,r);if(!cell||!cell.gid)return;
-      if(drawnGids[cell.gid])return;drawnGids[cell.gid]=true;
-      var grp=groupMap[cell.gid];if(!grp||grp.cells.length<2)return;
-      grp.cells.forEach(function(pos){var s=cellToScreen(pos.c,pos.r);drawDiamond(gctx,s.x,s.y,null,'rgba(245,200,66,0.80)',2.0);});
-      var bbox=groupBBox(grp.cells);
-      var fs=cellToScreen(bbox.minC+bbox.w-1,bbox.minR+bbox.h-1);
-      var bh=BLOCKS[grp.id]?BLOCKS[grp.id].bh:30;
-      var lx=fs.x,ly=fs.y-bh*zoom-4*zoom,fz=Math.max(9,Math.min(15,zoom*11)),lbl=bbox.w+'×'+bbox.h;
-      gctx.save();gctx.font='bold '+fz+'px sans-serif';gctx.textAlign='center';gctx.textBaseline='bottom';
-      var tw=gctx.measureText(lbl).width;gctx.fillStyle='rgba(0,0,0,0.70)';gctx.fillRect(lx-tw/2-3,ly-fz-2,tw+6,fz+4);gctx.fillStyle='#f5c842';gctx.fillText(lbl,lx,ly);gctx.restore();
+  // ── Pass 3: グループ化アニメ（合体した瞬間だけラベル表示）────
+  // 常時の枠・ラベルは表示しない。合体時のみふわっと表示して消える。
+  var now3=performance.now();
+  var activeFlash=false;
+  Object.keys(groupFormedAnims).forEach(function(gid){
+    var anim=groupFormedAnims[gid];
+    var elapsed=now3-anim.startTime;
+    if(elapsed>=GROUP_FORMED_DURATION){ delete groupFormedAnims[gid]; return; }
+    activeFlash=true;
+    var t=elapsed/GROUP_FORMED_DURATION;
+    // フェード：0→0.3で出現、0.3→1.0で消える
+    var alpha = t<0.3 ? (t/0.3) : (1-(t-0.3)/0.7);
+    alpha = Math.max(0,Math.min(1,alpha));
+
+    // 枠（合体したセルを一瞬ゴールドで囲む）
+    anim.cells.forEach(function(pos){
+      var s=cellToScreen(pos.c,pos.r);
+      drawDiamond(gctx,s.x,s.y,
+        'rgba(245,200,66,'+(alpha*0.35)+')',
+        'rgba(245,200,66,'+alpha+')', 2.5);
     });
-  }
+
+    // ラベル（グループ中央・上に浮かび上がる）
+    var cells2=anim.cells;
+    var minC=cells2[0].c,maxC=cells2[0].c,minR=cells2[0].r,maxR=cells2[0].r;
+    for(var i=1;i<cells2.length;i++){if(cells2[i].c<minC)minC=cells2[i].c;if(cells2[i].c>maxC)maxC=cells2[i].c;if(cells2[i].r<minR)minR=cells2[i].r;if(cells2[i].r>maxR)maxR=cells2[i].r;}
+    var midC=(minC+maxC)/2, midR=(minR+maxR)/2;
+    var midS=cellToScreen(midC,midR);
+    // 上に浮かび上がるオフセット
+    var floatY = -20*zoom * (t<0.3 ? t/0.3 : 1.0);
+    var bh=BLOCKS[anim.id]?BLOCKS[anim.id].bh:30;
+    var lx=midS.x, ly=midS.y-bh*zoom+floatY;
+    var fs=Math.max(11,Math.min(20,zoom*15));
+    gctx.save();
+    gctx.globalAlpha=alpha;
+    gctx.font='bold '+fs+'px sans-serif';
+    gctx.textAlign='center'; gctx.textBaseline='bottom';
+    var tw=gctx.measureText(anim.label).width;
+    gctx.fillStyle='rgba(0,0,0,0.75)';
+    gctx.fillRect(lx-tw/2-5,ly-fs-3,tw+10,fs+6);
+    gctx.fillStyle='#f5c842';
+    gctx.fillText(anim.label,lx,ly);
+    gctx.restore();
+  });
+  if(activeFlash) _startRafLoop();
 
   // Pass 4: ドラッグフラッシュ
   var fa=_getFlashAlpha();
