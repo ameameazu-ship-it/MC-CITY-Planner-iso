@@ -399,18 +399,18 @@ function initUI(){
     }
   });
 
-  on('settings-clear', 'click', function(){
-    if(!confirm(t('confirm_clear'))) return;
-    // ★ clearAllCells() で cells と groupMap を両方クリア
-    if(typeof clearAllCells === 'function'){
-      clearAllCells();
-    } else {
-      if(typeof clearAllCells==='function') clearAllCells();
-      else cells={};
-    }
-    closeSettings();
-    scheduleRender();
-  });
+
+
+
+
+
+
+
+
+
+
+
+
 
   on('settings-night', 'click', toggleNight);
 
