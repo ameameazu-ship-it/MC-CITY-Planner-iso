@@ -62,8 +62,40 @@ function floodFill(c,r){
 }
 
 // Drag Move
-function _startDragMove(k,cx,cy){dragMoveKey=k;dragMoveOrigin={x:cx,y:cy};dragMoveMode=false;dragHighlightKey=k;scheduleRender();}
-function _doDragMove(toC,toR){
+// ドラッグ中の移動先チェック結果（iso-engine.js から参照）
+var dragTargetValid  = false;   // 移動可能か
+var dragTargetCells  = [];      // 移動先セルリスト [{c,r}]
+
+// 移動先の可否だけチェック（実際には動かさない）
+function _checkDragTarget(toC, toR){
+  dragTargetCells = [];
+  dragTargetValid = false;
+  if(!dragMoveKey) return;
+  var sp=dragMoveKey.split(','), srcC=parseInt(sp[0]), srcR=parseInt(sp[1]);
+  var srcCell=getCell(srcC,srcR); if(!srcCell) return;
+  var dc=toC-srcC, dr=toR-srcR;
+  var moveCells=[];
+  var gid=srcCell.gid;
+  if(gid&&groupMap[gid]){ moveCells=groupMap[gid].cells.map(function(p){return{c:p.c,r:p.r};}); }
+  else { moveCells=[{c:srcC,r:srcR}]; }
+  // 移動先セルを計算
+  var destCells = moveCells.map(function(p){ return{c:p.c+dc, r:p.r+dr}; });
+  dragTargetCells = destCells;
+  // 範囲チェック
+  for(var i=0;i<destCells.length;i++){
+    if(!inGrid(destCells[i].c, destCells[i].r)) return;
+  }
+  // 障害物チェック
+  var srcKeys={};
+  moveCells.forEach(function(p){ srcKeys[ck(p.c,p.r)]=1; });
+  for(var i=0;i<destCells.length;i++){
+    var dk=ck(destCells[i].c, destCells[i].r);
+    if(!srcKeys[dk] && cells[dk]) return;
+  }
+  dragTargetValid = true;
+}
+function _startDragMove(k,cx,cy){dragMoveKey=k;dragMoveOrigin={x:cx,y:cy};dragMoveMode=false;dragHighlightKey=k;dragTargetCells=[];dragTargetValid=false;scheduleRender();}
+
   if(!dragMoveKey)return;
   var sp=dragMoveKey.split(','),srcC=parseInt(sp[0]),srcR=parseInt(sp[1]);
   if(toC===srcC&&toR===srcR)return;
@@ -80,7 +112,7 @@ function _doDragMove(toC,toR){
   moved.forEach(function(m){recomputeGroups(m.c+dc,m.r+dr);});
   dragMoveKey=ck(srcC+dc,srcR+dr);dragHighlightKey=dragMoveKey;scheduleRender();
 }
-function _endDragMove(){dragMoveKey=null;dragMoveOrigin=null;dragMoveMode=false;dragHighlightKey=null;}
+function _endDragMove(){dragMoveKey=null;dragMoveOrigin=null;dragMoveMode=false;dragHighlightKey=null;dragTargetCells=[];dragTargetValid=false;}
 
 // Audio
 var _audioCtx=null,_didPlace=false,_placeCount=0;
@@ -215,7 +247,7 @@ function onTouchMove(e){
   cancelLongPress();
   if(!isPointerDown||ts.length!==1)return;
   var t0=ts[0];
-  if(dragMoveKey){var dx=t0.clientX-dragMoveOrigin.x,dy=t0.clientY-dragMoveOrigin.y;if(!dragMoveMode&&Math.sqrt(dx*dx+dy*dy)>DRAG_THRESHOLD){dragMoveMode=true;closeCtxMenu();if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;}}if(dragMoveMode){var cell=clientToCell(t0.clientX,t0.clientY);hoverC=cell.c;hoverR=cell.r;_doDragMove(cell.c,cell.r);}scheduleRender();return;}
+  if(dragMoveKey){var dx=t0.clientX-dragMoveOrigin.x,dy=t0.clientY-dragMoveOrigin.y;if(!dragMoveMode&&Math.sqrt(dx*dx+dy*dy)>DRAG_THRESHOLD){dragMoveMode=true;closeCtxMenu();if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;}}if(dragMoveMode){var cell=clientToCell(t0.clientX,t0.clientY);hoverC=cell.c;hoverR=cell.r;_checkDragTarget(cell.c,cell.r);_doDragMove(cell.c,cell.r);}scheduleRender();return;}
   var dx2=t0.clientX-touchStartX,dy2=t0.clientY-touchStartY;
   var cell=clientToCell(t0.clientX,t0.clientY);hoverC=cell.c;hoverR=cell.r;
   if(!touchDrawStarted&&Math.sqrt(dx2*dx2+dy2*dy2)<DRAW_THRESHOLD){scheduleRender();return;}
@@ -253,7 +285,7 @@ function onWindowMouseMove(e){
   if(isPanning){var dx=e.clientX-_lastMouseX,dy=e.clientY-_lastMouseY;panX+=dx*0.55;panY+=dy*0.55;_lastMouseX=e.clientX;_lastMouseY=e.clientY;render();return;}
   var rect=gc.getBoundingClientRect();
   var inside=e.clientX>=rect.left&&e.clientX<=rect.right&&e.clientY>=rect.top&&e.clientY<=rect.bottom;
-  if(dragMoveKey){var dx=e.clientX-dragMoveOrigin.x,dy=e.clientY-dragMoveOrigin.y;if(!dragMoveMode&&Math.sqrt(dx*dx+dy*dy)>DRAG_THRESHOLD){dragMoveMode=true;closeCtxMenu();if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;}}if(dragMoveMode&&inside){var cell=clientToCell(e.clientX,e.clientY);hoverC=cell.c;hoverR=cell.r;_doDragMove(cell.c,cell.r);}scheduleRender();return;}
+  if(dragMoveKey){var dx=e.clientX-dragMoveOrigin.x,dy=e.clientY-dragMoveOrigin.y;if(!dragMoveMode&&Math.sqrt(dx*dx+dy*dy)>DRAG_THRESHOLD){dragMoveMode=true;closeCtxMenu();if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;}}if(dragMoveMode&&inside){var cell=clientToCell(e.clientX,e.clientY);hoverC=cell.c;hoverR=cell.r;_checkDragTarget(cell.c,cell.r);_doDragMove(cell.c,cell.r);}scheduleRender();return;}
   if(!inside){if(hoverC>=0){hoverC=-1;hoverR=-1;scheduleRender();}if(isPointerDown){commitStamp();isPointerDown=false;}return;}
   var cell=clientToCell(e.clientX,e.clientY);hoverC=cell.c;hoverR=cell.r;
   if(isPointerDown){if(stampMode)stampedSet=new Set();_didPlace=false;handleDraw(cell.c,cell.r);if(_didPlace)_playAndVibe();_didPlace=false;}
