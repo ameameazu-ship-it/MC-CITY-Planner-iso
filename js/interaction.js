@@ -51,7 +51,21 @@ function recomputeGroups(c,r){
 }
 function _dissolveGroup(c,r){var mc=getCell(c,r);if(!mc||!mc.gid)return;var grp=groupMap[mc.gid];if(grp){grp.cells.forEach(function(p){var m=getCell(p.c,p.r);if(m)delete m.gid;});delete groupMap[mc.gid];}}
 function clearAllCells(){cells={};groupMap={};nextGid=1;scheduleRender();}
-function placeCell(c,r){if(!inGrid(c,r))return false;var k=ck(c,r),rid=resolveId(selectedId);if(cells[k]&&cells[k].id===rid)return false;_dissolveGroup(c,r);cells[k]={id:rid,dir:'none'};triggerBlockAnim(c,r);recomputeGroups(c,r);scheduleRender();return true;}
+
+// ── 修正1: 既存ブロックへの上書きを禁止 ─────────────────────────
+// cells[k] が存在する場合はツールに関わらず配置不可。
+// 「消す」で削除してから配置する運用に統一。
+function placeCell(c,r){
+  if(!inGrid(c,r))return false;
+  var k=ck(c,r),rid=resolveId(selectedId);
+  if(cells[k])return false;           // ← 変更点: 既存ブロックがあれば配置しない
+  cells[k]={id:rid,dir:'none'};
+  triggerBlockAnim(c,r);
+  recomputeGroups(c,r);
+  scheduleRender();
+  return true;
+}
+
 function eraseCell(c,r){if(!inGrid(c,r))return;var k=ck(c,r);if(!cells[k])return;_dissolveGroup(c,r);delete cells[k];scheduleRender();}
 function floodFill(c,r){
   if(!inGrid(c,r))return;
@@ -194,8 +208,11 @@ function initInteraction(){
   updateCursor();updateUndoBtns();
 }
 
+// ── 修正2: 移動モード発動時にスタンプタイマーをキャンセル ────────
 function _onLongPress(c,r,clientX,clientY){
   if(!getCell(c,r))return;
+  // ブロックあり → 移動モード。スタンプタイマーは不要なのでキャンセル。
+  if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;}
   _playLongPressSound();
   if(vibeOn&&navigator.vibrate)navigator.vibrate(30);
   pushUndo();
@@ -205,11 +222,23 @@ function _onLongPress(c,r,clientX,clientY){
   if(typeof triggerParticleBurst==='function')triggerParticleBurst(c,r);
 }
 
-// ── スタンプモード発動コールバック ───────────────────────────────
 function _onStampReady(c,r){
   if(vibeOn&&navigator.vibrate)navigator.vibrate([30,60,30]);
   _playAndVibe();
   if(typeof triggerStampBurst==='function')triggerStampBurst(c,r);
+}
+
+// ── 修正3: スタンプタイマーは空きマスのときのみ開始 ─────────────
+// ブロックがあるマスを長押し → 移動モードのみ（スタンプは起動しない）
+// ブロックがないマスを長押し → スタンプモードのみ（移動は_onLongPressで弾かれる）
+function _startStampTimer(c,r){
+  if(getCell(c,r))return;   // ← 既存ブロックあり = スタンプタイマー不要
+  var _sc=c,_sr=r;
+  stampLPTimer=setTimeout(function(){
+    stampMode=true;
+    _onStampReady(_sc,_sr);
+    stampLPTimer=null;
+  },STAMP_LONG_MS);
 }
 
 function onTouchStart(e){
@@ -238,12 +267,7 @@ function onTouchStart(e){
   isPointerDown=true;touchDrawStarted=false;stampedSet=new Set();stampStartC=cell.c;stampStartR=cell.r;
   if(tool==='draw'){
     stampMode=false;
-    var _sc=stampStartC,_sr=stampStartR;  // クロージャ用にキャプチャ
-    stampLPTimer=setTimeout(function(){
-      stampMode=true;
-      _onStampReady(_sc,_sr);  // ★ スタンプ演出
-      stampLPTimer=null;
-    },STAMP_LONG_MS);
+    _startStampTimer(cell.c,cell.r);  // ← 修正3を使用
   }
 }
 
@@ -324,12 +348,7 @@ function onMouseDown(e){
   handleDraw(cell.c,cell.r);
   if(tool==='draw'){
     stampMode=false;
-    var _sc=stampStartC,_sr=stampStartR;  // クロージャ用にキャプチャ
-    stampLPTimer=setTimeout(function(){
-      stampMode=true;
-      _onStampReady(_sc,_sr);  // ★ スタンプ演出
-      stampLPTimer=null;
-    },STAMP_LONG_MS);
+    _startStampTimer(cell.c,cell.r);  // ← 修正3を使用
   }
 }
 
