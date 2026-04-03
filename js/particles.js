@@ -1,10 +1,8 @@
 /**
- * particles.js  v2.0
- * 長押し成功時: 光の輪が円状に放射状に広がる衝撃波エフェクト
+ * particles.js  v2.1
  *
- * index.html の </body> 直前に追加:
- *   <script src="js/particles.js"></script>
- * （iso-engine.js より後、interaction.js より前）
+ * triggerParticleBurst(c, r)  -- 長押し移動モード: ゴールドの衝撃波
+ * triggerStampBurst(c, r)     -- 長押しスタンプモード: 緑の二重パルス
  */
 
 var _ptCanvas=null,_ptCtx=null,_ptWaves=[],_ptRafId=null,_ptLast=0;
@@ -28,92 +26,82 @@ function _ptResize(){
   _ptCanvas.height=wrap.offsetHeight||window.innerHeight;
 }
 
-/**
- * triggerParticleBurst(c, r)
- * ブロック位置を中心に光の輪を放射状に展開する。
- */
-function triggerParticleBurst(c,r){
-  _ptSetup();
-
+// ── スクリーン座標取得 ────────────────────────────────────────────
+function _ptCenter(c,r){
   var s=cellToScreen(c,r);
-  var bh=0;
-  var cell=getCell(c,r);
+  var bh=0,cell=getCell(c,r);
   if(cell&&BLOCKS[cell.id]){
     bh=(BLOCKS[cell.id].bh||0)*zoom;
     if(typeof BH_SCALE!=='undefined')bh*=BH_SCALE;
   }
-  // ブロック上面中心
-  var cx=s.x, cy=s.y+HH*zoom-bh*0.5;
+  return {x:s.x, y:s.y+HH*zoom-bh*0.5};
+}
 
-  // 輪を3重で発火（少しずつ遅延・サイズ違い）
-  var rings=[
-    {delay:0,   maxR:68*zoom, dur:0.38, lw:3.5*zoom, col:'rgba(255,230,100,A)'},
-    {delay:0.04, maxR:52*zoom, dur:0.32, lw:2.0*zoom, col:'rgba(255,255,200,A)'},
-    {delay:0.10, maxR:38*zoom, dur:0.26, lw:1.2*zoom, col:'rgba(200,230,255,A)'}
-  ];
+// ── 波形を追加 ───────────────────────────────────────────────────
+function _ptAddWave(cx,cy,maxR,dur,lw,col,delay){
+  _ptWaves.push({cx:cx,cy:cy,maxR:maxR,dur:dur,lw:lw,col:col,elapsed:-(delay||0)});
+}
 
-  var now=performance.now();
-  rings.forEach(function(def){
-    _ptWaves.push({
-      cx:cx, cy:cy,
-      maxR:def.maxR,
-      dur:def.dur,
-      lw:def.lw,
-      col:def.col,
-      elapsed:-def.delay  // マイナスにしておいて delay 後に始まる
-    });
-  });
+// ── 移動モード: ゴールド衝撃波 ───────────────────────────────────
+function triggerParticleBurst(c,r){
+  _ptSetup();
+  var p=_ptCenter(c,r),cx=p.x,cy=p.y;
+  _ptAddWave(cx,cy,68*zoom,0.38,3.5*zoom,'rgba(255,230,100,A)',0);
+  _ptAddWave(cx,cy,52*zoom,0.32,2.0*zoom,'rgba(255,255,200,A)',0.04);
+  _ptAddWave(cx,cy,38*zoom,0.26,1.2*zoom,'rgba(200,230,255,A)',0.10);
+  // 中心フラッシュ (lw=0 で塗りつぶし)
+  _ptAddWave(cx,cy,22*zoom,0.18,0,      'rgba(255,245,180,A)',0);
+  if(!_ptRafId)_ptLoop();
+}
 
-  // 中心フラッシュ（塗りつぶし円、即消え）
-  _ptWaves.push({
-    cx:cx, cy:cy,
-    maxR:22*zoom,
-    dur:0.18,
-    lw:0,               // lw=0 で塗りつぶし円
-    col:'rgba(255,245,180,A)',
-    elapsed:0
-  });
+// ── スタンプモード: 緑の二重パルス ──────────────────────────────
+// 特徴: 移動より小さく・速く・2回パルス（連続配置のリズム感）
+function triggerStampBurst(c,r){
+  _ptSetup();
+  var p=_ptCenter(c,r),cx=p.x,cy=p.y;
+
+  // 1パルス目
+  _ptAddWave(cx,cy,48*zoom,0.28,3.0*zoom,'rgba(80,255,160,A)', 0);
+  _ptAddWave(cx,cy,34*zoom,0.22,1.8*zoom,'rgba(160,255,220,A)',0.03);
+  // 中心フラッシュ
+  _ptAddWave(cx,cy,16*zoom,0.14,0,       'rgba(180,255,210,A)',0);
+
+  // 2パルス目（少し遅れて追いかける）
+  _ptAddWave(cx,cy,40*zoom,0.24,2.2*zoom,'rgba(60,220,140,A)', 0.15);
+  _ptAddWave(cx,cy,28*zoom,0.20,1.2*zoom,'rgba(140,255,200,A)',0.18);
 
   if(!_ptRafId)_ptLoop();
 }
 
+// ── レンダーループ ────────────────────────────────────────────────
 function _ptLoop(ts){
   var now=ts||performance.now();
   var dt=Math.min((now-(_ptLast||now))/1000,0.05);
   _ptLast=now;
-
   _ptCtx.clearRect(0,0,_ptCanvas.width,_ptCanvas.height);
 
   var alive=false;
   for(var i=_ptWaves.length-1;i>=0;i--){
     var w=_ptWaves[i];
     w.elapsed+=dt;
-    if(w.elapsed<0)continue;          // delay 中
+    if(w.elapsed<0)continue;
     if(w.elapsed>=w.dur){_ptWaves.splice(i,1);continue;}
-
     alive=true;
-    var t=w.elapsed/w.dur;            // 0→1
 
-    // イージング: ease-out cubic（素早く広がって止まる）
-    var et=1-Math.pow(1-t,3);
+    var t=w.elapsed/w.dur;
+    var et=1-Math.pow(1-t,3);          // ease-out cubic
     var r=w.maxR*et;
-
-    // 透明度: 序盤に一気に出て後半にフェードアウト
     var alpha=t<0.15?(t/0.15):Math.pow(1-t,1.6);
     alpha=Math.max(0,Math.min(1,alpha));
 
     var col=w.col.replace('A',alpha.toFixed(3));
     _ptCtx.beginPath();
     _ptCtx.arc(w.cx,w.cy,Math.max(0.5,r),0,Math.PI*2);
-
     if(w.lw===0){
-      // 塗りつぶし円（中心フラッシュ）
-      _ptCtx.fillStyle=col;
-      _ptCtx.fill();
+      _ptCtx.fillStyle=col; _ptCtx.fill();
     } else {
-      // リング（輪）
       _ptCtx.strokeStyle=col;
-      _ptCtx.lineWidth=w.lw*(1-t*0.5);  // 広がるにつれ細くなる
+      _ptCtx.lineWidth=w.lw*(1-t*0.5);
       _ptCtx.stroke();
     }
   }
