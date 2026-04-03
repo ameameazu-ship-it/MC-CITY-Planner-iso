@@ -202,13 +202,13 @@ function _onLongPress(c,r,clientX,clientY){
   _startDragMove(ck(c,r),clientX,clientY);
   if(typeof triggerDragFlash==='function')triggerDragFlash(c,r);
   if(typeof triggerSinkAnim==='function')triggerSinkAnim(c,r);
+  // ★ パーティクル演出
+  if(typeof triggerParticleBurst==='function')triggerParticleBurst(c,r);
 }
 
 function onTouchStart(e){
   e.preventDefault();
   var ts=e.touches;
-
-  // 2本指: ピンチズーム
   if(ts.length>=2){
     cancelLongPress();isPointerDown=false;touchDrawStarted=false;
     touchPanActive=false;
@@ -221,16 +221,11 @@ function onTouchStart(e){
   isPinching=false;
   var t0=ts[0];touchStartX=t0.clientX;touchStartY=t0.clientY;
 
-  // パンモード: 単指でフィールドをスライド
   if(isPanMode){
-    touchPanActive=true;
-    touchPanLastX=t0.clientX;
-    touchPanLastY=t0.clientY;
-    updateCursor();
-    return;
+    touchPanActive=true;touchPanLastX=t0.clientX;touchPanLastY=t0.clientY;
+    updateCursor();return;
   }
 
-  // 通常描画モード
   touchPanActive=false;
   var cell=clientToCell(t0.clientX,t0.clientY);hoverC=cell.c;hoverR=cell.r;scheduleRender();
   if(tool==='fill'){pushUndo();floodFill(cell.c,cell.r);return;}
@@ -246,31 +241,22 @@ function onTouchStart(e){
 function onTouchMove(e){
   e.preventDefault();
   var ts=e.touches;
-
-  // 2本指ピンチ
   if(ts.length>=2&&isPinching){
     var rect=gc.getBoundingClientRect(),d=ptDist(ts[0],ts[1]),mid=ptMid(ts[0],ts[1]);
     var midX=mid.x-rect.left,midY=mid.y-rect.top;
     var nz=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,pinchZoom0*Math.pow(d/pinch0,0.50)));
     var zr=nz/pinchZoom0;
-    panX=midX-(pinchMid0X-pinchPanX0)*zr;
-    panY=midY-(pinchMid0Y-pinchPanY0)*zr;
-    zoom=nz;scheduleRender();return;
+    panX=midX-(pinchMid0X-pinchPanX0)*zr;panY=midY-(pinchMid0Y-pinchPanY0)*zr;zoom=nz;scheduleRender();return;
   }
-
-  // パンモード: 単指スライド
   if(touchPanActive&&ts.length===1){
     var t0=ts[0];
     var dx=t0.clientX-touchPanLastX,dy=t0.clientY-touchPanLastY;
-    panX+=dx;panY+=dy;
-    touchPanLastX=t0.clientX;touchPanLastY=t0.clientY;
+    panX+=dx;panY+=dy;touchPanLastX=t0.clientX;touchPanLastY=t0.clientY;
     scheduleRender();return;
   }
-
   cancelLongPress();
   if(!isPointerDown||ts.length!==1)return;
   var t0=ts[0];
-
   if(dragMoveKey){
     var dx=t0.clientX-dragMoveOrigin.x,dy=t0.clientY-dragMoveOrigin.y;
     if(!dragMoveMode&&Math.sqrt(dx*dx+dy*dy)>DRAG_THRESHOLD){
@@ -279,12 +265,10 @@ function onTouchMove(e){
     }
     if(dragMoveMode){
       var cell=clientToCell(t0.clientX,t0.clientY);
-      hoverC=cell.c;hoverR=cell.r;
-      _checkDragTarget(cell.c,cell.r);_doDragMove(cell.c,cell.r);
+      hoverC=cell.c;hoverR=cell.r;_checkDragTarget(cell.c,cell.r);_doDragMove(cell.c,cell.r);
     }
     scheduleRender();return;
   }
-
   var dx2=t0.clientX-touchStartX,dy2=t0.clientY-touchStartY;
   var cell=clientToCell(t0.clientX,t0.clientY);hoverC=cell.c;hoverR=cell.r;
   if(!touchDrawStarted&&Math.sqrt(dx2*dx2+dy2*dy2)<DRAW_THRESHOLD){scheduleRender();return;}
@@ -294,19 +278,9 @@ function onTouchMove(e){
 
 function onTouchEnd(e){
   e.preventDefault();
-
-  // パンモード終了
-  if(touchPanActive){
-    touchPanActive=false;
-    updateCursor();
-    return;
-  }
-
+  if(touchPanActive){touchPanActive=false;updateCursor();return;}
   if(isPinching){
-    if(e.touches.length<2){
-      isPinching=false;isPointerDown=false;touchDrawStarted=false;
-      hoverC=-1;hoverR=-1;scheduleRender();
-    }
+    if(e.touches.length<2){isPinching=false;isPointerDown=false;touchDrawStarted=false;hoverC=-1;hoverR=-1;scheduleRender();}
     return;
   }
   cancelLongPress();if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;}
@@ -345,9 +319,7 @@ function onMouseDown(e){
 function onWindowMouseMove(e){
   if(isPanning){
     var dx=e.clientX-_lastMouseX,dy=e.clientY-_lastMouseY;
-    panX+=dx;panY+=dy;
-    _lastMouseX=e.clientX;_lastMouseY=e.clientY;
-    render();return;
+    panX+=dx;panY+=dy;_lastMouseX=e.clientX;_lastMouseY=e.clientY;render();return;
   }
   var rect=gc.getBoundingClientRect();
   var inside=e.clientX>=rect.left&&e.clientX<=rect.right&&e.clientY>=rect.top&&e.clientY<=rect.bottom;
@@ -359,8 +331,7 @@ function onWindowMouseMove(e){
     }
     if(dragMoveMode&&inside){
       var cell=clientToCell(e.clientX,e.clientY);
-      hoverC=cell.c;hoverR=cell.r;
-      _checkDragTarget(cell.c,cell.r);_doDragMove(cell.c,cell.r);
+      hoverC=cell.c;hoverR=cell.r;_checkDragTarget(cell.c,cell.r);_doDragMove(cell.c,cell.r);
     }
     scheduleRender();return;
   }
