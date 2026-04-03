@@ -47,7 +47,7 @@ function recomputeGroups(c,r){
   Object.keys(bestGids).forEach(function(gid){var grp=groupMap[gid];if(grp){grp.cells.forEach(function(p){var m=getCell(p.c,p.r);if(m)delete m.gid;});delete groupMap[gid];}});
   var ng='g'+(nextGid++);best.forEach(function(p){var m=getCell(p.c,p.r);if(m)m.gid=ng;});groupMap[ng]={cells:best,id:id};
   var bbox2={w:best.reduce(function(mx,p){return Math.max(mx,p.c);},best[0].c)-best.reduce(function(mn,p){return Math.min(mn,p.c);},best[0].c)+1,h:best.reduce(function(mx,p){return Math.max(mx,p.r);},best[0].r)-best.reduce(function(mn,p){return Math.min(mn,p.r);},best[0].r)+1};
-  if(typeof triggerGroupFormed==='function') triggerGroupFormed(ng, bbox2.w+'×'+bbox2.h, best);
+  if(typeof triggerGroupFormed==='function')triggerGroupFormed(ng,bbox2.w+'×'+bbox2.h,best);
 }
 function _dissolveGroup(c,r){var mc=getCell(c,r);if(!mc||!mc.gid)return;var grp=groupMap[mc.gid];if(grp){grp.cells.forEach(function(p){var m=getCell(p.c,p.r);if(m)delete m.gid;});delete groupMap[mc.gid];}}
 function clearAllCells(){cells={};groupMap={};nextGid=1;scheduleRender();}
@@ -202,8 +202,14 @@ function _onLongPress(c,r,clientX,clientY){
   _startDragMove(ck(c,r),clientX,clientY);
   if(typeof triggerDragFlash==='function')triggerDragFlash(c,r);
   if(typeof triggerSinkAnim==='function')triggerSinkAnim(c,r);
-  // ★ パーティクル演出
   if(typeof triggerParticleBurst==='function')triggerParticleBurst(c,r);
+}
+
+// ── スタンプモード発動コールバック ───────────────────────────────
+function _onStampReady(c,r){
+  if(vibeOn&&navigator.vibrate)navigator.vibrate([30,60,30]);
+  _playAndVibe();
+  if(typeof triggerStampBurst==='function')triggerStampBurst(c,r);
 }
 
 function onTouchStart(e){
@@ -220,12 +226,10 @@ function onTouchStart(e){
   }
   isPinching=false;
   var t0=ts[0];touchStartX=t0.clientX;touchStartY=t0.clientY;
-
   if(isPanMode){
     touchPanActive=true;touchPanLastX=t0.clientX;touchPanLastY=t0.clientY;
     updateCursor();return;
   }
-
   touchPanActive=false;
   var cell=clientToCell(t0.clientX,t0.clientY);hoverC=cell.c;hoverR=cell.r;scheduleRender();
   if(tool==='fill'){pushUndo();floodFill(cell.c,cell.r);return;}
@@ -234,7 +238,12 @@ function onTouchStart(e){
   isPointerDown=true;touchDrawStarted=false;stampedSet=new Set();stampStartC=cell.c;stampStartR=cell.r;
   if(tool==='draw'){
     stampMode=false;
-    stampLPTimer=setTimeout(function(){stampMode=true;if(vibeOn&&navigator.vibrate)navigator.vibrate([30,60,30]);_playAndVibe();stampLPTimer=null;},STAMP_LONG_MS);
+    var _sc=stampStartC,_sr=stampStartR;  // クロージャ用にキャプチャ
+    stampLPTimer=setTimeout(function(){
+      stampMode=true;
+      _onStampReady(_sc,_sr);  // ★ スタンプ演出
+      stampLPTimer=null;
+    },STAMP_LONG_MS);
   }
 }
 
@@ -313,7 +322,15 @@ function onMouseDown(e){
   isPointerDown=true;stampStartC=cell.c;stampStartR=cell.r;stampedSet=new Set();
   if(getCell(cell.c,cell.r)){longPressTimer=setTimeout(function(){longPressTimer=null;_onLongPress(cell.c,cell.r,e.clientX,e.clientY);},480);}
   handleDraw(cell.c,cell.r);
-  if(tool==='draw'){stampMode=false;stampLPTimer=setTimeout(function(){stampMode=true;if(vibeOn&&navigator.vibrate)navigator.vibrate([30,60,30]);_playAndVibe();stampLPTimer=null;},STAMP_LONG_MS);}
+  if(tool==='draw'){
+    stampMode=false;
+    var _sc=stampStartC,_sr=stampStartR;  // クロージャ用にキャプチャ
+    stampLPTimer=setTimeout(function(){
+      stampMode=true;
+      _onStampReady(_sc,_sr);  // ★ スタンプ演出
+      stampLPTimer=null;
+    },STAMP_LONG_MS);
+  }
 }
 
 function onWindowMouseMove(e){
