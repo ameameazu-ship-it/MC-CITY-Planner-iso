@@ -1,178 +1,127 @@
 /**
- * particles.js
- * 長押し成功時の光パーティクル演出
+ * particles.js  v2.0
+ * 長押し成功時: 光の輪が円状に放射状に広がる衝撃波エフェクト
  *
- * index.html に以下を追加してください（iso-engine.js の後）:
+ * index.html の </body> 直前に追加:
  *   <script src="js/particles.js"></script>
- *
- * interaction.js の _onLongPress から
- *   triggerParticleBurst(c, r)
- * を呼び出すことで発動します。
+ * （iso-engine.js より後、interaction.js より前）
  */
 
-// ── オーバーレイCanvas セットアップ ──────────────────────────────
-var _ptCanvas = null, _ptCtx = null;
-var _ptParticles = [];
-var _ptRafId = null;
+var _ptCanvas=null,_ptCtx=null,_ptWaves=[],_ptRafId=null,_ptLast=0;
 
-function _ptSetup() {
-  if (_ptCanvas) return;
-  _ptCanvas = document.createElement('canvas');
-  _ptCanvas.style.cssText = [
-    'position:absolute', 'top:0', 'left:0',
-    'pointer-events:none', 'z-index:10'
-  ].join(';');
-  var wrap = document.getElementById('canvas-wrap') || document.body;
-  wrap.style.position = wrap.style.position || 'relative';
+function _ptSetup(){
+  if(_ptCanvas)return;
+  _ptCanvas=document.createElement('canvas');
+  _ptCanvas.style.cssText='position:absolute;top:0;left:0;pointer-events:none;z-index:10';
+  var wrap=document.getElementById('canvas-wrap')||document.body;
+  wrap.style.position=wrap.style.position||'relative';
   wrap.appendChild(_ptCanvas);
-  _ptCtx = _ptCanvas.getContext('2d');
+  _ptCtx=_ptCanvas.getContext('2d');
   _ptResize();
-  window.addEventListener('resize', _ptResize);
+  window.addEventListener('resize',_ptResize);
 }
 
-function _ptResize() {
-  if (!_ptCanvas) return;
-  var wrap = document.getElementById('canvas-wrap') || document.body;
-  _ptCanvas.width  = wrap.offsetWidth  || window.innerWidth;
-  _ptCanvas.height = wrap.offsetHeight || window.innerHeight;
+function _ptResize(){
+  if(!_ptCanvas)return;
+  var wrap=document.getElementById('canvas-wrap')||document.body;
+  _ptCanvas.width =wrap.offsetWidth ||window.innerWidth;
+  _ptCanvas.height=wrap.offsetHeight||window.innerHeight;
 }
 
-// ── パーティクル生成 ─────────────────────────────────────────────
 /**
  * triggerParticleBurst(c, r)
- * グリッド座標 (c, r) のブロック位置から光を飛び散らせる。
- * interaction.js の _onLongPress から呼び出す。
+ * ブロック位置を中心に光の輪を放射状に展開する。
  */
-function triggerParticleBurst(c, r) {
+function triggerParticleBurst(c,r){
   _ptSetup();
 
-  // ブロックのスクリーン座標（iso-engine.js の cellToScreen を使用）
-  var s  = cellToScreen(c, r);
-  var bh = 0;
-  var cell = getCell(c, r);
-  if (cell && BLOCKS[cell.id]) {
-    bh = (BLOCKS[cell.id].bh || 0) * zoom;
-    if (typeof BH_SCALE !== 'undefined') bh *= BH_SCALE;
+  var s=cellToScreen(c,r);
+  var bh=0;
+  var cell=getCell(c,r);
+  if(cell&&BLOCKS[cell.id]){
+    bh=(BLOCKS[cell.id].bh||0)*zoom;
+    if(typeof BH_SCALE!=='undefined')bh*=BH_SCALE;
   }
-  var cx = s.x;
-  var cy = s.y + HH * zoom - bh;  // ブロック上面の中心あたり
+  // ブロック上面中心
+  var cx=s.x, cy=s.y+HH*zoom-bh*0.5;
 
-  // パーティクル色テーブル（ゴールド〜白〜水色）
-  var colors = [
-    'rgba(255,230,80,A)',
-    'rgba(255,255,180,A)',
-    'rgba(255,200,60,A)',
-    'rgba(220,240,255,A)',
-    'rgba(180,220,255,A)',
-    'rgba(255,255,255,A)'
+  // 輪を3重で発火（少しずつ遅延・サイズ違い）
+  var rings=[
+    {delay:0,   maxR:68*zoom, dur:0.38, lw:3.5*zoom, col:'rgba(255,230,100,A)'},
+    {delay:0.04, maxR:52*zoom, dur:0.32, lw:2.0*zoom, col:'rgba(255,255,200,A)'},
+    {delay:0.10, maxR:38*zoom, dur:0.26, lw:1.2*zoom, col:'rgba(200,230,255,A)'}
   ];
 
-  var count = 18;
-  for (var i = 0; i < count; i++) {
-    var angle  = (Math.PI * 2 / count) * i + Math.random() * 0.4;
-    var speed  = (1.8 + Math.random() * 2.8) * zoom;
-    var size   = (1.8 + Math.random() * 2.4) * zoom;
-    var life   = 0.55 + Math.random() * 0.35;  // 秒
-    var col    = colors[Math.floor(Math.random() * colors.length)];
-    var shape  = Math.random() < 0.5 ? 'circle' : 'star';
-
-    _ptParticles.push({
-      x: cx, y: cy,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - speed * 0.3,  // 少し上向きバイアス
-      size: size,
-      maxSize: size * (1.6 + Math.random()),
-      life: life,
-      maxLife: life,
-      color: col,
-      shape: shape,
-      gravity: 0.08 * zoom
+  var now=performance.now();
+  rings.forEach(function(def){
+    _ptWaves.push({
+      cx:cx, cy:cy,
+      maxR:def.maxR,
+      dur:def.dur,
+      lw:def.lw,
+      col:def.col,
+      elapsed:-def.delay  // マイナスにしておいて delay 後に始まる
     });
-  }
-
-  // 中心フラッシュ（大きな円がすぐ消える）
-  _ptParticles.push({
-    x: cx, y: cy,
-    vx: 0, vy: 0,
-    size: 4 * zoom,
-    maxSize: 28 * zoom,
-    life: 0.25,
-    maxLife: 0.25,
-    color: 'rgba(255,240,160,A)',
-    shape: 'flash',
-    gravity: 0
   });
 
-  if (!_ptRafId) _ptLoop();
+  // 中心フラッシュ（塗りつぶし円、即消え）
+  _ptWaves.push({
+    cx:cx, cy:cy,
+    maxR:22*zoom,
+    dur:0.18,
+    lw:0,               // lw=0 で塗りつぶし円
+    col:'rgba(255,245,180,A)',
+    elapsed:0
+  });
+
+  if(!_ptRafId)_ptLoop();
 }
 
-// ── レンダーループ ────────────────────────────────────────────────
-var _ptLast = 0;
+function _ptLoop(ts){
+  var now=ts||performance.now();
+  var dt=Math.min((now-(_ptLast||now))/1000,0.05);
+  _ptLast=now;
 
-function _ptLoop(ts) {
-  var now = ts || performance.now();
-  var dt  = Math.min((now - (_ptLast || now)) / 1000, 0.05);
-  _ptLast = now;
+  _ptCtx.clearRect(0,0,_ptCanvas.width,_ptCanvas.height);
 
-  _ptCtx.clearRect(0, 0, _ptCanvas.width, _ptCanvas.height);
+  var alive=false;
+  for(var i=_ptWaves.length-1;i>=0;i--){
+    var w=_ptWaves[i];
+    w.elapsed+=dt;
+    if(w.elapsed<0)continue;          // delay 中
+    if(w.elapsed>=w.dur){_ptWaves.splice(i,1);continue;}
 
-  var alive = false;
-  for (var i = _ptParticles.length - 1; i >= 0; i--) {
-    var p = _ptParticles[i];
-    p.life -= dt;
-    if (p.life <= 0) { _ptParticles.splice(i, 1); continue; }
-    alive = true;
+    alive=true;
+    var t=w.elapsed/w.dur;            // 0→1
 
-    var t     = 1 - p.life / p.maxLife;  // 0→1
-    var alpha = p.life / p.maxLife;       // 1→0
-    var sz    = p.size + (p.maxSize - p.size) * t;
+    // イージング: ease-out cubic（素早く広がって止まる）
+    var et=1-Math.pow(1-t,3);
+    var r=w.maxR*et;
 
-    // 位置更新
-    p.x  += p.vx;
-    p.y  += p.vy;
-    p.vy += p.gravity;
-    p.vx *= 0.94;
-    p.vy *= 0.94;
+    // 透明度: 序盤に一気に出て後半にフェードアウト
+    var alpha=t<0.15?(t/0.15):Math.pow(1-t,1.6);
+    alpha=Math.max(0,Math.min(1,alpha));
 
-    var col = p.color.replace('A', alpha.toFixed(3));
-    _ptCtx.fillStyle = col;
+    var col=w.col.replace('A',alpha.toFixed(3));
+    _ptCtx.beginPath();
+    _ptCtx.arc(w.cx,w.cy,Math.max(0.5,r),0,Math.PI*2);
 
-    if (p.shape === 'flash') {
-      // 中心フラッシュ: 大きな円
-      _ptCtx.beginPath();
-      _ptCtx.arc(p.x, p.y, sz, 0, Math.PI * 2);
+    if(w.lw===0){
+      // 塗りつぶし円（中心フラッシュ）
+      _ptCtx.fillStyle=col;
       _ptCtx.fill();
-
-    } else if (p.shape === 'circle') {
-      // 丸いパーティクル
-      _ptCtx.beginPath();
-      _ptCtx.arc(p.x, p.y, sz * 0.5, 0, Math.PI * 2);
-      _ptCtx.fill();
-
     } else {
-      // 星形パーティクル
-      _ptStar(_ptCtx, p.x, p.y, 4, sz * 0.55, sz * 0.25,
-              t * Math.PI * 3);  // 回転
+      // リング（輪）
+      _ptCtx.strokeStyle=col;
+      _ptCtx.lineWidth=w.lw*(1-t*0.5);  // 広がるにつれ細くなる
+      _ptCtx.stroke();
     }
   }
 
-  if (alive) {
-    _ptRafId = requestAnimationFrame(_ptLoop);
+  if(alive){
+    _ptRafId=requestAnimationFrame(_ptLoop);
   } else {
-    _ptRafId = null;
-    _ptCtx.clearRect(0, 0, _ptCanvas.width, _ptCanvas.height);
+    _ptRafId=null;
+    _ptCtx.clearRect(0,0,_ptCanvas.width,_ptCanvas.height);
   }
-}
-
-// ── 星形描画ヘルパー ─────────────────────────────────────────────
-function _ptStar(ctx, x, y, points, outer, inner, rotation) {
-  ctx.beginPath();
-  for (var i = 0; i < points * 2; i++) {
-    var r   = i % 2 === 0 ? outer : inner;
-    var ang = (Math.PI / points) * i + rotation;
-    if (i === 0) ctx.moveTo(x + r * Math.cos(ang), y + r * Math.sin(ang));
-    else         ctx.lineTo(x + r * Math.cos(ang), y + r * Math.sin(ang));
-  }
-  ctx.closePath();
-  ctx.fill();
 }
