@@ -8,6 +8,7 @@ var dragHighlightKey=null;
 var isPinching=false,pinch0=0,pinchZoom0=1,pinchPanX0=0,pinchPanY0=0,pinchMid0X=0,pinchMid0Y=0;
 var touchDrawStarted=false,touchStartX=0,touchStartY=0,DRAW_THRESHOLD=10;
 var isPanMode=false,isPanning=false,_lastMouseX=0,_lastMouseY=0;
+var touchPanActive=false,touchPanLastX=0,touchPanLastY=0;
 var groupMap={},nextGid=1;
 function mergeId(id){return id.replace(/\d+$/,'');}
 function sameKind(a,b){return mergeId(a)===mergeId(b);}
@@ -45,7 +46,6 @@ function recomputeGroups(c,r){
   if(!best)return;
   Object.keys(bestGids).forEach(function(gid){var grp=groupMap[gid];if(grp){grp.cells.forEach(function(p){var m=getCell(p.c,p.r);if(m)delete m.gid;});delete groupMap[gid];}});
   var ng='g'+(nextGid++);best.forEach(function(p){var m=getCell(p.c,p.r);if(m)m.gid=ng;});groupMap[ng]={cells:best,id:id};
-  // ★ グループ化した瞬間だけラベルをアニメ表示
   var bbox2={w:best.reduce(function(mx,p){return Math.max(mx,p.c);},best[0].c)-best.reduce(function(mn,p){return Math.min(mn,p.c);},best[0].c)+1,h:best.reduce(function(mx,p){return Math.max(mx,p.r);},best[0].r)-best.reduce(function(mn,p){return Math.min(mn,p.r);},best[0].r)+1};
   if(typeof triggerGroupFormed==='function') triggerGroupFormed(ng, bbox2.w+'×'+bbox2.h, best);
 }
@@ -62,37 +62,23 @@ function floodFill(c,r){
 }
 
 // Drag Move
-// ドラッグ中の移動先チェック結果（iso-engine.js から参照）
-var dragTargetValid  = false;   // 移動可能か
-var dragTargetCells  = [];      // 移動先セルリスト [{c,r}]
+var dragTargetValid=false;
+var dragTargetCells=[];
 
-// 移動先の可否だけチェック（実際には動かさない）
-function _checkDragTarget(toC, toR){
-  dragTargetCells = [];
-  dragTargetValid = false;
-  if(!dragMoveKey) return;
-  var sp=dragMoveKey.split(','), srcC=parseInt(sp[0]), srcR=parseInt(sp[1]);
-  var srcCell=getCell(srcC,srcR); if(!srcCell) return;
-  var dc=toC-srcC, dr=toR-srcR;
-  var moveCells=[];
-  var gid=srcCell.gid;
-  if(gid&&groupMap[gid]){ moveCells=groupMap[gid].cells.map(function(p){return{c:p.c,r:p.r};}); }
-  else { moveCells=[{c:srcC,r:srcR}]; }
-  // 移動先セルを計算
-  var destCells = moveCells.map(function(p){ return{c:p.c+dc, r:p.r+dr}; });
-  dragTargetCells = destCells;
-  // 範囲チェック
-  for(var i=0;i<destCells.length;i++){
-    if(!inGrid(destCells[i].c, destCells[i].r)) return;
-  }
-  // 障害物チェック
-  var srcKeys={};
-  moveCells.forEach(function(p){ srcKeys[ck(p.c,p.r)]=1; });
-  for(var i=0;i<destCells.length;i++){
-    var dk=ck(destCells[i].c, destCells[i].r);
-    if(!srcKeys[dk] && cells[dk]) return;
-  }
-  dragTargetValid = true;
+function _checkDragTarget(toC,toR){
+  dragTargetCells=[];dragTargetValid=false;
+  if(!dragMoveKey)return;
+  var sp=dragMoveKey.split(','),srcC=parseInt(sp[0]),srcR=parseInt(sp[1]);
+  var srcCell=getCell(srcC,srcR);if(!srcCell)return;
+  var dc=toC-srcC,dr=toR-srcR,moveCells=[],gid=srcCell.gid;
+  if(gid&&groupMap[gid])moveCells=groupMap[gid].cells.map(function(p){return{c:p.c,r:p.r};});
+  else moveCells=[{c:srcC,r:srcR}];
+  var destCells=moveCells.map(function(p){return{c:p.c+dc,r:p.r+dr};});
+  dragTargetCells=destCells;
+  for(var i=0;i<destCells.length;i++){if(!inGrid(destCells[i].c,destCells[i].r))return;}
+  var srcKeys={};moveCells.forEach(function(p){srcKeys[ck(p.c,p.r)]=1;});
+  for(var i=0;i<destCells.length;i++){var dk=ck(destCells[i].c,destCells[i].r);if(!srcKeys[dk]&&cells[dk])return;}
+  dragTargetValid=true;
 }
 function _startDragMove(k,cx,cy){dragMoveKey=k;dragMoveOrigin={x:cx,y:cy};dragMoveMode=false;dragHighlightKey=k;dragTargetCells=[];dragTargetValid=false;scheduleRender();}
 
@@ -132,28 +118,20 @@ function _mcPlaceSound(pm){
     b.connect(bg);bg.connect(out);b.start(t);b.stop(t+0.04);}catch(e){}
 }
 
-// ★ 長押し成功：低音「ドン」のみ
 function _playLongPressSound(){
   if(!soundOn)return;var ctx=_getAudioCtx();if(!ctx)return;
   try{
     var t=ctx.currentTime,out=ctx.createGain();out.gain.setValueAtTime(1,t);out.connect(ctx.destination);
-    // 低音サイン波（ずっしり・大きく）
     var o=ctx.createOscillator();o.type='sine';
     o.frequency.setValueAtTime(65,t);o.frequency.exponentialRampToValueAtTime(28,t+0.35);
     var g=ctx.createGain();
-    g.gain.setValueAtTime(0,t);
-    g.gain.linearRampToValueAtTime(1.0,t+0.01);   // 素早く最大音量へ
-    g.gain.exponentialRampToValueAtTime(0.001,t+0.40);
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(1.0,t+0.01);g.gain.exponentialRampToValueAtTime(0.001,t+0.40);
     o.connect(g);g.connect(out);o.start(t);o.stop(t+0.42);
-    // サブベース（さらに低い倍音で厚みを出す）
     var o2=ctx.createOscillator();o2.type='sine';
     o2.frequency.setValueAtTime(32,t);o2.frequency.exponentialRampToValueAtTime(18,t+0.30);
     var g2=ctx.createGain();
-    g2.gain.setValueAtTime(0,t);
-    g2.gain.linearRampToValueAtTime(0.55,t+0.012);
-    g2.gain.exponentialRampToValueAtTime(0.001,t+0.35);
+    g2.gain.setValueAtTime(0,t);g2.gain.linearRampToValueAtTime(0.55,t+0.012);g2.gain.exponentialRampToValueAtTime(0.001,t+0.35);
     o2.connect(g2);g2.connect(out);o2.start(t);o2.stop(t+0.36);
-    // 低域ノイズ（衝撃感）
     var bs=Math.floor(ctx.sampleRate*0.05),buf=ctx.createBuffer(1,bs,ctx.sampleRate),d=buf.getChannelData(0);
     for(var i=0;i<bs;i++)d[i]=(Math.random()*2-1);
     var n=ctx.createBufferSource();n.buffer=buf;
@@ -163,7 +141,6 @@ function _playLongPressSound(){
   }catch(e){}
 }
 
-// ★ ドロップ：「コトン」
 function _playDropSound(){
   if(!soundOn)return;var ctx=_getAudioCtx();if(!ctx)return;
   try{
@@ -192,7 +169,7 @@ function ptDist(a,b){var dx=a.clientX-b.clientX,dy=a.clientY-b.clientY;return Ma
 function ptMid(a,b){return{x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2};}
 
 function setTool(t2){tool=t2;['draw','erase','fill'].forEach(function(tt){var b=document.getElementById('tool-'+tt);if(b)b.classList.toggle('active',tt===t2);});}
-function updateCursor(){if(!gc)return;gc.style.cursor=isPanning?'grabbing':(isPanMode?'grab':'crosshair');}
+function updateCursor(){if(!gc)return;gc.style.cursor=isPanning||touchPanActive?'grabbing':(isPanMode?'grab':'crosshair');}
 function togglePanMode(){isPanMode=!isPanMode;var btn=document.getElementById('btn-center');if(btn)btn.classList.toggle('on',isPanMode);updateCursor();}
 
 function initInteraction(){
@@ -230,25 +207,84 @@ function _onLongPress(c,r,clientX,clientY){
 function onTouchStart(e){
   e.preventDefault();
   var ts=e.touches;
-  if(ts.length>=2){cancelLongPress();isPointerDown=false;touchDrawStarted=false;stampedSet=new Set();_endDragMove();var rect=gc.getBoundingClientRect(),d=ptDist(ts[0],ts[1]),mid=ptMid(ts[0],ts[1]);isPinching=true;pinch0=d;pinchZoom0=zoom;pinchPanX0=panX;pinchPanY0=panY;pinchMid0X=mid.x-rect.left;pinchMid0Y=mid.y-rect.top;return;}
+
+  // 2本指: ピンチズーム
+  if(ts.length>=2){
+    cancelLongPress();isPointerDown=false;touchDrawStarted=false;
+    touchPanActive=false;
+    stampedSet=new Set();_endDragMove();
+    var rect=gc.getBoundingClientRect(),d=ptDist(ts[0],ts[1]),mid=ptMid(ts[0],ts[1]);
+    isPinching=true;pinch0=d;pinchZoom0=zoom;pinchPanX0=panX;pinchPanY0=panY;
+    pinchMid0X=mid.x-rect.left;pinchMid0Y=mid.y-rect.top;
+    return;
+  }
   isPinching=false;
   var t0=ts[0];touchStartX=t0.clientX;touchStartY=t0.clientY;
+
+  // パンモード: 単指でフィールドをスライド
+  if(isPanMode){
+    touchPanActive=true;
+    touchPanLastX=t0.clientX;
+    touchPanLastY=t0.clientY;
+    updateCursor();
+    return;
+  }
+
+  // 通常描画モード
+  touchPanActive=false;
   var cell=clientToCell(t0.clientX,t0.clientY);hoverC=cell.c;hoverR=cell.r;scheduleRender();
   if(tool==='fill'){pushUndo();floodFill(cell.c,cell.r);return;}
   lpC=cell.c;lpR=cell.r;
   longPressTimer=setTimeout(function(){longPressTimer=null;_onLongPress(lpC,lpR,touchStartX,touchStartY);},480);
   isPointerDown=true;touchDrawStarted=false;stampedSet=new Set();stampStartC=cell.c;stampStartR=cell.r;
-  if(tool==='draw'){stampMode=false;stampLPTimer=setTimeout(function(){stampMode=true;if(vibeOn&&navigator.vibrate)navigator.vibrate([30,60,30]);_playAndVibe();stampLPTimer=null;},STAMP_LONG_MS);}
+  if(tool==='draw'){
+    stampMode=false;
+    stampLPTimer=setTimeout(function(){stampMode=true;if(vibeOn&&navigator.vibrate)navigator.vibrate([30,60,30]);_playAndVibe();stampLPTimer=null;},STAMP_LONG_MS);
+  }
 }
 
 function onTouchMove(e){
   e.preventDefault();
   var ts=e.touches;
-  if(ts.length>=2&&isPinching){var rect=gc.getBoundingClientRect(),d=ptDist(ts[0],ts[1]),mid=ptMid(ts[0],ts[1]);var midX=mid.x-rect.left,midY=mid.y-rect.top;var nz=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,pinchZoom0*Math.pow(d/pinch0,0.50)));var zr=nz/pinchZoom0;panX=midX-(pinchMid0X-pinchPanX0)*zr;panY=midY-(pinchMid0Y-pinchPanY0)*zr;zoom=nz;scheduleRender();return;}
+
+  // 2本指ピンチ
+  if(ts.length>=2&&isPinching){
+    var rect=gc.getBoundingClientRect(),d=ptDist(ts[0],ts[1]),mid=ptMid(ts[0],ts[1]);
+    var midX=mid.x-rect.left,midY=mid.y-rect.top;
+    var nz=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,pinchZoom0*Math.pow(d/pinch0,0.50)));
+    var zr=nz/pinchZoom0;
+    panX=midX-(pinchMid0X-pinchPanX0)*zr;
+    panY=midY-(pinchMid0Y-pinchPanY0)*zr;
+    zoom=nz;scheduleRender();return;
+  }
+
+  // パンモード: 単指スライド
+  if(touchPanActive&&ts.length===1){
+    var t0=ts[0];
+    var dx=t0.clientX-touchPanLastX,dy=t0.clientY-touchPanLastY;
+    panX+=dx;panY+=dy;
+    touchPanLastX=t0.clientX;touchPanLastY=t0.clientY;
+    scheduleRender();return;
+  }
+
   cancelLongPress();
   if(!isPointerDown||ts.length!==1)return;
   var t0=ts[0];
-  if(dragMoveKey){var dx=t0.clientX-dragMoveOrigin.x,dy=t0.clientY-dragMoveOrigin.y;if(!dragMoveMode&&Math.sqrt(dx*dx+dy*dy)>DRAG_THRESHOLD){dragMoveMode=true;closeCtxMenu();if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;}}if(dragMoveMode){var cell=clientToCell(t0.clientX,t0.clientY);hoverC=cell.c;hoverR=cell.r;_checkDragTarget(cell.c,cell.r);_doDragMove(cell.c,cell.r);}scheduleRender();return;}
+
+  if(dragMoveKey){
+    var dx=t0.clientX-dragMoveOrigin.x,dy=t0.clientY-dragMoveOrigin.y;
+    if(!dragMoveMode&&Math.sqrt(dx*dx+dy*dy)>DRAG_THRESHOLD){
+      dragMoveMode=true;closeCtxMenu();
+      if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;}
+    }
+    if(dragMoveMode){
+      var cell=clientToCell(t0.clientX,t0.clientY);
+      hoverC=cell.c;hoverR=cell.r;
+      _checkDragTarget(cell.c,cell.r);_doDragMove(cell.c,cell.r);
+    }
+    scheduleRender();return;
+  }
+
   var dx2=t0.clientX-touchStartX,dy2=t0.clientY-touchStartY;
   var cell=clientToCell(t0.clientX,t0.clientY);hoverC=cell.c;hoverR=cell.r;
   if(!touchDrawStarted&&Math.sqrt(dx2*dx2+dy2*dy2)<DRAW_THRESHOLD){scheduleRender();return;}
@@ -258,19 +294,35 @@ function onTouchMove(e){
 
 function onTouchEnd(e){
   e.preventDefault();
-  if(isPinching){if(e.touches.length<2){isPinching=false;isPointerDown=false;touchDrawStarted=false;hoverC=-1;hoverR=-1;scheduleRender();}return;}
+
+  // パンモード終了
+  if(touchPanActive){
+    touchPanActive=false;
+    updateCursor();
+    return;
+  }
+
+  if(isPinching){
+    if(e.touches.length<2){
+      isPinching=false;isPointerDown=false;touchDrawStarted=false;
+      hoverC=-1;hoverR=-1;scheduleRender();
+    }
+    return;
+  }
   cancelLongPress();if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;}
   if(dragMoveKey){
     if(dragMoveMode){
       _playDropSound();if(vibeOn&&navigator.vibrate)navigator.vibrate(18);
-      // ドロップ後フィードバック（ふわっと上に消える）
       var _dk=dragMoveKey.split(','),_dc=parseInt(_dk[0]),_dr=parseInt(_dk[1]);
       if(typeof triggerDropFeedback==='function'){
-        if(dragTargetValid) triggerDropFeedback('OK!',_dc,_dr,'#50ff70');
+        if(dragTargetValid)triggerDropFeedback('OK!',_dc,_dr,'#50ff70');
         else triggerDropFeedback('✕',_dc,_dr,'#ff5555');
       }
+    }else{
+      if(undoStack.length)undoStack.pop();updateUndoBtns();
+      var parts=dragMoveKey.split(',');
+      openCtxMenu(parseInt(parts[0]),parseInt(parts[1]),touchStartX,touchStartY);
     }
-    else{if(undoStack.length)undoStack.pop();updateUndoBtns();var parts=dragMoveKey.split(',');openCtxMenu(parseInt(parts[0]),parseInt(parts[1]),touchStartX,touchStartY);}
     _endDragMove();isPointerDown=false;touchDrawStarted=false;stampMode=false;_placeCount=0;hoverC=-1;hoverR=-1;scheduleRender();return;
   }
   _didPlace=false;
@@ -291,13 +343,36 @@ function onMouseDown(e){
 }
 
 function onWindowMouseMove(e){
-  if(isPanning){var dx=e.clientX-_lastMouseX,dy=e.clientY-_lastMouseY;panX+=dx*0.55;panY+=dy*0.55;_lastMouseX=e.clientX;_lastMouseY=e.clientY;render();return;}
+  if(isPanning){
+    var dx=e.clientX-_lastMouseX,dy=e.clientY-_lastMouseY;
+    panX+=dx;panY+=dy;
+    _lastMouseX=e.clientX;_lastMouseY=e.clientY;
+    render();return;
+  }
   var rect=gc.getBoundingClientRect();
   var inside=e.clientX>=rect.left&&e.clientX<=rect.right&&e.clientY>=rect.top&&e.clientY<=rect.bottom;
-  if(dragMoveKey){var dx=e.clientX-dragMoveOrigin.x,dy=e.clientY-dragMoveOrigin.y;if(!dragMoveMode&&Math.sqrt(dx*dx+dy*dy)>DRAG_THRESHOLD){dragMoveMode=true;closeCtxMenu();if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;}}if(dragMoveMode&&inside){var cell=clientToCell(e.clientX,e.clientY);hoverC=cell.c;hoverR=cell.r;_checkDragTarget(cell.c,cell.r);_doDragMove(cell.c,cell.r);}scheduleRender();return;}
-  if(!inside){if(hoverC>=0){hoverC=-1;hoverR=-1;scheduleRender();}if(isPointerDown){commitStamp();isPointerDown=false;}return;}
+  if(dragMoveKey){
+    var dx=e.clientX-dragMoveOrigin.x,dy=e.clientY-dragMoveOrigin.y;
+    if(!dragMoveMode&&Math.sqrt(dx*dx+dy*dy)>DRAG_THRESHOLD){
+      dragMoveMode=true;closeCtxMenu();
+      if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;}
+    }
+    if(dragMoveMode&&inside){
+      var cell=clientToCell(e.clientX,e.clientY);
+      hoverC=cell.c;hoverR=cell.r;
+      _checkDragTarget(cell.c,cell.r);_doDragMove(cell.c,cell.r);
+    }
+    scheduleRender();return;
+  }
+  if(!inside){
+    if(hoverC>=0){hoverC=-1;hoverR=-1;scheduleRender();}
+    if(isPointerDown){commitStamp();isPointerDown=false;}return;
+  }
   var cell=clientToCell(e.clientX,e.clientY);hoverC=cell.c;hoverR=cell.r;
-  if(isPointerDown){if(stampMode)stampedSet=new Set();_didPlace=false;handleDraw(cell.c,cell.r);if(_didPlace)_playAndVibe();_didPlace=false;}
+  if(isPointerDown){
+    if(stampMode)stampedSet=new Set();
+    _didPlace=false;handleDraw(cell.c,cell.r);if(_didPlace)_playAndVibe();_didPlace=false;
+  }
   scheduleRender();
 }
 
@@ -309,11 +384,15 @@ function onWindowMouseUp(e){
       _playDropSound();if(vibeOn&&navigator.vibrate)navigator.vibrate(18);
       var _mk=dragMoveKey.split(','),_mc=parseInt(_mk[0]),_mr=parseInt(_mk[1]);
       if(typeof triggerDropFeedback==='function'){
-        if(dragTargetValid) triggerDropFeedback('OK!',_mc,_mr,'#50ff70');
+        if(dragTargetValid)triggerDropFeedback('OK!',_mc,_mr,'#50ff70');
         else triggerDropFeedback('✕',_mc,_mr,'#ff5555');
       }
+    }else{
+      if(undoStack.length)undoStack.pop();updateUndoBtns();
+      var parts=dragMoveKey.split(',');
+      var c=parseInt(parts[0]),r=parseInt(parts[1]);
+      if(getCell(c,r))openCtxMenu(c,r,e.clientX,e.clientY);
     }
-    else{if(undoStack.length)undoStack.pop();updateUndoBtns();var parts=dragMoveKey.split(',');var c=parseInt(parts[0]),r=parseInt(parts[1]);if(getCell(c,r))openCtxMenu(c,r,e.clientX,e.clientY);}
     _endDragMove();isPointerDown=false;return;
   }
   _didPlace=false;if(isPointerDown)commitStamp();if(_didPlace)_playAndVibe();_didPlace=false;_placeCount=0;isPointerDown=false;
