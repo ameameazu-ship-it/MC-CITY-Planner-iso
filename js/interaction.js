@@ -84,20 +84,11 @@ function placeCell(c,r){
   var b=BLOCKS[rid]; if(!b) return false;
   var gW=(b.gridW)||1, gH=(b.gridH)||1;
 
-  // 固定サイズブロック：フードフィル選択中は配置しない
   if(gW>1||gH>1){
-    // フットプリント全体が範囲内か
-    for(var dc=0;dc<gW;dc++) for(var dr=0;dr<gH;dr++) if(!inGrid(c+dc,r+dr)) return false;
-    // 既存セルをクリア（ゴーストは元のアンカーごと削除）
-    for(var dc=0;dc<gW;dc++){
-      for(var dr=0;dr<gH;dr++){
-        var fk=ck(c+dc,r+dr);
-        if(cells[fk]){
-          var fc=cells[fk];
-          if(fc.ghost) _eraseAnchor(fc.anchorC,fc.anchorR);
-          else _eraseAnchor(c+dc,r+dr);
-        }
-      }
+    // 固定サイズブロック：フットプリント全体が空かチェック
+    for(var dc=0;dc<gW;dc++) for(var dr=0;dr<gH;dr++){
+      if(!inGrid(c+dc,r+dr)) return false;
+      if(cells[ck(c+dc,r+dr)]) return false; // 既存セルがあれば配置しない
     }
     // アンカー配置
     cells[ck(c,r)]={id:rid,dir:'none'};
@@ -111,14 +102,9 @@ function placeCell(c,r){
     return true;
   }
 
-  // 1×1ブロック
+  // 1×1ブロック：空セルのみ配置可（既存セルは上書きしない）
   var k=ck(c,r);
-  if(cells[k]&&!cells[k].ghost&&cells[k].id===rid) return false;
-  // 既存セル削除
-  if(cells[k]){
-    if(cells[k].ghost) _eraseAnchor(cells[k].anchorC,cells[k].anchorR);
-    else { _dissolveGroup(c,r); delete cells[k]; }
-  }
+  if(cells[k]) return false;
   cells[k]={id:rid,dir:'none'};
   triggerBlockAnim(c,r);
   recomputeGroups(c,r);
@@ -216,8 +202,12 @@ function _doDragMove(toC,toR){
   var gW=(b&&b.gridW)||1, gH=(b&&b.gridH)||1;
   var isFixed=gW>1||gH>1;
 
-  // 移動元を削除
-  moveCells.forEach(function(p){delete cells[ck(p.c,p.r)];});
+  // 移動元のデータを保存してから削除
+  var movedData=moveCells.map(function(p){
+    var k2=ck(p.c,p.r), cellData=cells[k2];
+    delete cells[k2];
+    return {c:p.c, r:p.r, id:(cellData&&cellData.id)||srcCell.id, dir:(cellData&&cellData.dir)||'none'};
+  });
   if(srcCell.gid&&groupMap[srcCell.gid]) delete groupMap[srcCell.gid];
 
   var newAnchorC=srcC+dc, newAnchorR=srcR+dr;
@@ -230,11 +220,9 @@ function _doDragMove(toC,toR){
       cells[ck(newAnchorC+dcc,newAnchorR+drr)]={id:srcCell.id,dir:srcCell.dir||'none',ghost:true,anchorC:newAnchorC,anchorR:newAnchorR};
     }
   } else {
-    // 1×1 or グループ
-    moveCells.forEach(function(p){cells[ck(p.c+dc,p.r+dr)]={id:cells[ck(p.c,p.r)]?cells[ck(p.c,p.r)].id:srcCell.id,dir:srcCell.dir||'none'};});
-    // cellsからの取得は削除済みなのでsrcCellを使う
-    moveCells.forEach(function(p){cells[ck(p.c+dc,p.r+dr)]={id:srcCell.id,dir:srcCell.dir||'none'};});
-    moveCells.forEach(function(p){recomputeGroups(p.c+dc,p.r+dr);});
+    // 1×1 or グループ：各セルを移動先に配置
+    movedData.forEach(function(m){ cells[ck(m.c+dc,m.r+dr)]={id:m.id,dir:m.dir}; });
+    movedData.forEach(function(m){ recomputeGroups(m.c+dc,m.r+dr); });
   }
 
   dragMoveKey=ck(newAnchorC,newAnchorR); dragHighlightKey=dragMoveKey; scheduleRender();
