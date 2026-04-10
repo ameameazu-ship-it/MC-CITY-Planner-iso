@@ -122,27 +122,7 @@ function zoomAround(cx,cy,factor){var nz=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,zoo
 
 function drawDiamond(ctx,x,y,fill,stroke,strokeW){var hw=HW*zoom,hh=HH*zoom;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+hw,y+hh);ctx.lineTo(x,y+hh*2);ctx.lineTo(x-hw,y+hh);ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=strokeW||0.5;ctx.stroke();}}
 function clipDiamond(ctx,x,y){var hw=HW*zoom,hh=HH*zoom;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+hw,y+hh);ctx.lineTo(x,y+hh*2);ctx.lineTo(x-hw,y+hh);ctx.closePath();ctx.clip();}
-function isoBox(ctx,x,y,bh,tc,lc,rc){
-  var hw=HW*zoom,hh=HH*zoom,zb=bh*zoom;
-
-  // 左壁 (NW面) — 底辺を西頂点(x-hw,y+hh)・北頂点(x,y)に修正
-  ctx.beginPath();
-  ctx.moveTo(x,y-zb);ctx.lineTo(x-hw,y+hh-zb);
-  ctx.lineTo(x-hw,y+hh);ctx.lineTo(x,y);  // ← 旧: y+hh*2 → 修正
-  ctx.closePath();ctx.fillStyle=lc;ctx.fill();
-
-  // 右壁 (NE面) — 底辺を東頂点(x+hw,y+hh)・北頂点(x,y)に修正
-  ctx.beginPath();
-  ctx.moveTo(x,y-zb);ctx.lineTo(x+hw,y+hh-zb);
-  ctx.lineTo(x+hw,y+hh);ctx.lineTo(x,y);  // ← 旧: y+hh*2 → 修正
-  ctx.closePath();ctx.fillStyle=rc;ctx.fill();
-
-  // 天面 — 変更なし
-  ctx.beginPath();
-  ctx.moveTo(x,y-zb);ctx.lineTo(x+hw,y+hh-zb);
-  ctx.lineTo(x,y+hh*2-zb);ctx.lineTo(x-hw,y+hh-zb);
-  ctx.closePath();ctx.fillStyle=tc;ctx.fill();
-}
+function isoBox(ctx,x,y,bh,tc,lc,rc){var hw=HW*zoom,hh=HH*zoom,zb=bh*zoom;ctx.beginPath();ctx.moveTo(x,y-zb);ctx.lineTo(x-hw,y+hh-zb);ctx.lineTo(x-hw,y+hh*2);ctx.lineTo(x,y+hh*2);ctx.closePath();ctx.fillStyle=lc;ctx.fill();ctx.beginPath();ctx.moveTo(x,y-zb);ctx.lineTo(x+hw,y+hh-zb);ctx.lineTo(x+hw,y+hh*2);ctx.lineTo(x,y+hh*2);ctx.closePath();ctx.fillStyle=rc;ctx.fill();ctx.beginPath();ctx.moveTo(x,y-zb);ctx.lineTo(x+hw,y+hh-zb);ctx.lineTo(x,y+hh*2-zb);ctx.lineTo(x-hw,y+hh-zb);ctx.closePath();ctx.fillStyle=tc;ctx.fill();}
 function isoGableEW(ctx,x,y,bh,rh,tc,lc,rc){var hw=HW*zoom,hh=HH*zoom,zb=bh*zoom,zr=rh*zoom,by=y-zb;var N={x:x,y:by},E={x:x+hw,y:by+hh},S={x:x,y:by+2*hh},W={x:x-hw,y:by+hh},RW={x:x-hw,y:by+hh-zr},RE={x:x+hw,y:by+hh-zr};ctx.beginPath();ctx.moveTo(W.x,W.y);ctx.lineTo(N.x,N.y);ctx.lineTo(RE.x,RE.y);ctx.lineTo(RW.x,RW.y);ctx.closePath();ctx.fillStyle=lc;ctx.fill();ctx.beginPath();ctx.moveTo(E.x,E.y);ctx.lineTo(S.x,S.y);ctx.lineTo(RW.x,RW.y);ctx.lineTo(RE.x,RE.y);ctx.closePath();ctx.fillStyle=rc;ctx.fill();ctx.beginPath();ctx.moveTo(N.x,N.y);ctx.lineTo(E.x,E.y);ctx.lineTo(RE.x,RE.y);ctx.closePath();ctx.fillStyle=tc;ctx.fill();ctx.beginPath();ctx.moveTo(S.x,S.y);ctx.lineTo(W.x,W.y);ctx.lineTo(RW.x,RW.y);ctx.closePath();ctx.fillStyle=tc;ctx.fill();}
 function isoGableNS(ctx,x,y,bh,rh,tc,lc,rc){var hw=HW*zoom,hh=HH*zoom,zb=bh*zoom,zr=rh*zoom,by=y-zb;var N={x:x,y:by},E={x:x+hw,y:by+hh},S={x:x,y:by+2*hh},W={x:x-hw,y:by+hh},RN={x:x,y:by-zr},RS={x:x,y:by+2*hh-zr};ctx.beginPath();ctx.moveTo(W.x,W.y);ctx.lineTo(N.x,N.y);ctx.lineTo(RN.x,RN.y);ctx.lineTo(RS.x,RS.y);ctx.closePath();ctx.fillStyle=lc;ctx.fill();ctx.beginPath();ctx.moveTo(E.x,E.y);ctx.lineTo(S.x,S.y);ctx.lineTo(RS.x,RS.y);ctx.lineTo(RN.x,RN.y);ctx.closePath();ctx.fillStyle=rc;ctx.fill();ctx.beginPath();ctx.moveTo(N.x,N.y);ctx.lineTo(E.x,E.y);ctx.lineTo(RN.x,RN.y);ctx.closePath();ctx.fillStyle=tc;ctx.fill();ctx.beginPath();ctx.moveTo(S.x,S.y);ctx.lineTo(W.x,W.y);ctx.lineTo(RS.x,RS.y);ctx.closePath();ctx.fillStyle=tc;ctx.fill();}
 function isoHipRoof(ctx,x,y,bh,rh,lc,rc){var hw=HW*zoom,hh=HH*zoom,zb=bh*zoom,zr=rh*zoom,by=y-zb;var N={x:x,y:by},E={x:x+hw,y:by+hh},S={x:x,y:by+2*hh},W={x:x-hw,y:by+hh},tip={x:x,y:by-zr};ctx.beginPath();ctx.moveTo(N.x,N.y);ctx.lineTo(E.x,E.y);ctx.lineTo(tip.x,tip.y);ctx.closePath();ctx.fillStyle=rc;ctx.fill();ctx.beginPath();ctx.moveTo(E.x,E.y);ctx.lineTo(S.x,S.y);ctx.lineTo(tip.x,tip.y);ctx.closePath();ctx.fillStyle=rc;ctx.fill();ctx.beginPath();ctx.moveTo(S.x,S.y);ctx.lineTo(W.x,W.y);ctx.lineTo(tip.x,tip.y);ctx.closePath();ctx.fillStyle=lc;ctx.fill();ctx.beginPath();ctx.moveTo(W.x,W.y);ctx.lineTo(N.x,N.y);ctx.lineTo(tip.x,tip.y);ctx.closePath();ctx.fillStyle=lc;ctx.fill();}
@@ -171,18 +151,33 @@ function _renderNow(){
     drawDiamond(gctx,s.x,s.y,gfill,showGrid?(nightMode?ng:pal[4]):null,0.5);
   });
 
-  // Pass 2: ブロック（沈み込みオフセット適用）
+  // Pass 2: ブロック（ゴーストスキップ・固定サイズはスケーリング）
   tileList.forEach(function(cr){
-    var c=cr[0],r=cr[1],cell=getCell(c,r);if(!cell)return;
+    var c=cr[0],r=cr[1],cell=getCell(c,r); if(!cell) return;
+    if(cell.ghost) return; // ゴーストはアンカーで描画済みのためスキップ
+
+    var b=BLOCKS[cell.id];
+    var gW=(b&&b.gridW)||1, gH=(b&&b.gridH)||1;
     var s=cellToScreen(c,r);
-    var scale=getBlockScale(c,r);
-    // ★ 沈み込みオフセット（y方向に下げる）
     var sinkY=getSinkOffset(c,r);
     var drawY=s.y+sinkY;
+    var animScale=getBlockScale(c,r);
 
-    if(scale!==1){
+    if(gW>1||gH>1){
+      // 固定サイズブロック：フットプリント中央を軸に拡大描画
+      var midC=c+(gW-1)/2, midR=r+(gH-1)/2;
+      var midS=cellToScreen(midC,midR);
+      var blockScale=Math.sqrt(gW*gH);
+      var pivotX=midS.x, pivotY=midS.y+HH*zoom+sinkY;
+      gctx.save();
+      gctx.translate(pivotX,pivotY);
+      gctx.scale(blockScale*animScale,blockScale*animScale);
+      gctx.translate(-pivotX,-pivotY);
+      drawBlock(gctx,c,r,s.x,drawY,cell.id,cell.dir);
+      gctx.restore();
+    } else if(animScale!==1){
       var cx2=s.x,cy2=drawY+HH*zoom;
-      gctx.save();gctx.translate(cx2,cy2);gctx.scale(scale,scale);gctx.translate(-cx2,-cy2);
+      gctx.save();gctx.translate(cx2,cy2);gctx.scale(animScale,animScale);gctx.translate(-cx2,-cy2);
       drawBlock(gctx,c,r,s.x,drawY,cell.id,cell.dir);gctx.restore();
     } else {
       drawBlock(gctx,c,r,s.x,drawY,cell.id,cell.dir);
@@ -311,12 +306,5 @@ function scheduleRender(){
   if(!_rafLoopRunning)requestAnimationFrame(function(){if(dirty)_renderNow();});
 }
 
-function drawBlock(ctx,c,r,x,y,id,dir){
-  var b=BLOCKS[id];if(!b)return;
-  var fn=DRAW_FNS[id]||DRAW_FNS['_cat_'+b.cat]||drawGeneric;
-  // BH_SCALE が定義されていれば高さをスケーリング
-  var bs=(b.bh&&typeof BH_SCALE!=='undefined'&&BH_SCALE!==1)
-    ?Object.assign({},b,{bh:Math.round(b.bh*BH_SCALE)}):b;
-  fn(ctx,x,y,id,dir,bs);
-}
+function drawBlock(ctx,c,r,x,y,id,dir){var b=BLOCKS[id];if(!b)return;var fn=DRAW_FNS[id]||DRAW_FNS['_cat_'+b.cat]||drawGeneric;fn(ctx,x,y,id,dir,b);}
 function drawGeneric(ctx,x,y,id,dir,b){var bh=b.bh||30;isoBox(ctx,x,y,bh,'#3a5a4a','#2a4a38','#1e3028');var hh=HH*zoom,fs=Math.max(8,Math.min(22,zoom*18));ctx.save();ctx.font=fs+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(b.icon||'?',x,y-bh*zoom+hh*0.5);ctx.restore();}
