@@ -21,9 +21,9 @@ var BLOCKS = {
   apt2:     {cat:'r', icon:'🏢', bh:70, hidden:true, name:{ja:'マンション2', en:'Apt 2',      zh:'公寓2', ko:'아파트2'}},
   apt3:     {cat:'r', icon:'🏢', bh:82, hidden:true, name:{ja:'マンション3', en:'Apt 3',      zh:'公寓3', ko:'아파트3'}},
 
-  castle1:  {cat:'r', icon:'🏰', bh:52, variants:['castle1','castle2','castle3'], name:{ja:'お城',     en:'Castle',      zh:'城堡',   ko:'성'}},
-  castle2:  {cat:'r', icon:'🏰', bh:60, hidden:true, name:{ja:'お城2',  en:'Castle 2',    zh:'城堡2', ko:'성2'}},
-  castle3:  {cat:'r', icon:'🏰', bh:70, hidden:true, name:{ja:'お城3',  en:'Castle 3',    zh:'城堡3', ko:'성3'}},
+  castle1:  {cat:'r', icon:'🏰', bh:52, gridW:3, gridH:3, variants:['castle1','castle2','castle3'], name:{ja:'お城',     en:'Castle',      zh:'城堡',   ko:'성'}},
+  castle2:  {cat:'r', icon:'🏰', bh:60, gridW:3, gridH:3, hidden:true, name:{ja:'お城2',  en:'Castle 2',    zh:'城堡2', ko:'성2'}},
+  castle3:  {cat:'r', icon:'🏰', bh:70, gridW:3, gridH:3, hidden:true, name:{ja:'お城3',  en:'Castle 3',    zh:'城堡3', ko:'성3'}},
 
   church1:  {cat:'r', icon:'⛪', bh:48, variants:['church1','church2','church3'], name:{ja:'教会',     en:'Church',      zh:'教堂',   ko:'교회'}},
   church2:  {cat:'r', icon:'⛪', bh:57, hidden:true, name:{ja:'教会2',  en:'Church 2',    zh:'教堂2', ko:'교회2'}},
