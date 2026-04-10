@@ -336,17 +336,23 @@ function _onLongPress(c,r,clientX,clientY){
 function onTouchStart(e){
   e.preventDefault();
   var ts=e.touches;
-  if(ts.length>=2){cancelLongPress();isPointerDown=false;touchDrawStarted=false;stampedSet=new Set();_endDragMove();var rect=gc.getBoundingClientRect(),d=ptDist(ts[0],ts[1]),mid=ptMid(ts[0],ts[1]);isPinching=true;pinch0=d;pinchZoom0=zoom;pinchPanX0=panX;pinchPanY0=panY;pinchMid0X=mid.x-rect.left;pinchMid0Y=mid.y-rect.top;return;}
+  if(ts.length>=2){cancelLongPress();isPointerDown=false;touchDrawStarted=false;stampedSet=new Set();_endDragMove();isPanning=false;var rect=gc.getBoundingClientRect(),d=ptDist(ts[0],ts[1]),mid=ptMid(ts[0],ts[1]);isPinching=true;pinch0=d;pinchZoom0=zoom;pinchPanX0=panX;pinchPanY0=panY;pinchMid0X=mid.x-rect.left;pinchMid0Y=mid.y-rect.top;return;}
   isPinching=false;
   var t0=ts[0];touchStartX=t0.clientX;touchStartY=t0.clientY;
   var cell=clientToCell(t0.clientX,t0.clientY);hoverC=cell.c;hoverR=cell.r;scheduleRender();
 
-  // ★ パンモード：タッチでも地図を移動できる
+  // パンモード：タッチでも地図を移動
   if(isPanMode){ isPanning=true; _lastMouseX=t0.clientX; _lastMouseY=t0.clientY; return; }
+
+  // パンモード以外では必ずisPanningをリセット
+  isPanning=false;
 
   if(tool==='fill'){pushUndo();floodFill(cell.c,cell.r);return;}
   lpC=cell.c;lpR=cell.r;
-  longPressTimer=setTimeout(function(){longPressTimer=null;_onLongPress(lpC,lpR,touchStartX,touchStartY);},480);
+  longPressTimer=setTimeout(function(){
+    longPressTimer=null;
+    _onLongPress(lpC,lpR,touchStartX,touchStartY);
+  },480);
   isPointerDown=true;touchDrawStarted=false;stampedSet=new Set();stampStartC=cell.c;stampStartR=cell.r;
   if(tool==='draw'){stampMode=false;stampLPTimer=setTimeout(function(){stampMode=true;if(vibeOn&&navigator.vibrate)navigator.vibrate([30,60,30]);_playAndVibe();stampLPTimer=null;},STAMP_LONG_MS);}
 }
@@ -355,8 +361,13 @@ function onTouchMove(e){
   e.preventDefault();
   var ts=e.touches;
   if(ts.length>=2&&isPinching){var rect=gc.getBoundingClientRect(),d=ptDist(ts[0],ts[1]),mid=ptMid(ts[0],ts[1]);var midX=mid.x-rect.left,midY=mid.y-rect.top;var nz=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,pinchZoom0*Math.pow(d/pinch0,0.50)));var zr=nz/pinchZoom0;panX=midX-(pinchMid0X-pinchPanX0)*zr;panY=midY-(pinchMid0Y-pinchPanY0)*zr;zoom=nz;scheduleRender();return;}
-  // ★ パンモード：タッチで地図をスクロール
-  if(isPanning&&ts.length===1){var t0=ts[0];var dx=t0.clientX-_lastMouseX,dy=t0.clientY-_lastMouseY;panX+=dx;panY+=dy;_lastMouseX=t0.clientX;_lastMouseY=t0.clientY;scheduleRender();return;}
+  // パンモード中のタッチドラッグ：地図をスクロール
+  if(isPanning&&isPanMode&&ts.length===1){
+    var t0pan=ts[0];
+    panX+=t0pan.clientX-_lastMouseX; panY+=t0pan.clientY-_lastMouseY;
+    _lastMouseX=t0pan.clientX; _lastMouseY=t0pan.clientY;
+    scheduleRender();return;
+  }
   cancelLongPress();
   if(!isPointerDown||ts.length!==1) return;
   var t0=ts[0];
