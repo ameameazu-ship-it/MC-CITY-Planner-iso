@@ -335,15 +335,11 @@ function setDir(dir){
 
 function ctxDelete(){
   if(!inGrid(ctxC, ctxR)) return;
+  var cell=getCell(ctxC,ctxR); if(!cell) return;
+  var ac=ctxC, ar=ctxR;
+  if(cell.ghost){ac=cell.anchorC; ar=cell.anchorR;}
   pushUndo();
-  // グループも解体してから削除
-  var k = ctxC+','+ctxR;
-  var cell = cells[k];
-  if(cell && cell.gid && typeof groupMap !== 'undefined' && groupMap[cell.gid]){
-    groupMap[cell.gid].cells.forEach(function(pos){ var mc=cells[pos.c+','+pos.r]; if(mc) delete mc.gid; });
-    delete groupMap[cell.gid];
-  }
-  delete cells[k];
+  eraseCell(ac, ar);
   closeCtxMenu();
   scheduleRender();
 }
