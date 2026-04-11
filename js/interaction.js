@@ -9,8 +9,6 @@ var dragHighlightKey=null, dragTargetCells=[], dragTargetValid=false;
 var isPinching=false, pinch0=0, pinchZoom0=1, pinchPanX0=0, pinchPanY0=0, pinchMid0X=0, pinchMid0Y=0;
 var touchDrawStarted=false, touchStartX=0, touchStartY=0, DRAW_THRESHOLD=10;
 var isPanMode=false, isPanning=false, _lastMouseX=0, _lastMouseY=0;
-var lpCircle=null;
-var stampCircle=null;
 
 // ── Group / Merge（2×2のみ）─────────────────────────────────────
 var groupMap={}, nextGid=1;
@@ -57,7 +55,6 @@ function recomputeGroups(c,r){
   var bbox2={w:best.reduce(function(mx,p){return Math.max(mx,p.c);},best[0].c)-best.reduce(function(mn,p){return Math.min(mn,p.c);},best[0].c)+1,h:best.reduce(function(mx,p){return Math.max(mx,p.r);},best[0].r)-best.reduce(function(mn,p){return Math.min(mn,p.r);},best[0].r)+1};
   if(typeof triggerGroupFormed==='function') triggerGroupFormed(ng,bbox2.w+'×'+bbox2.h,best);
 }
-
 function _dissolveGroup(c,r){
   var mc=getCell(c,r); if(!mc||!mc.gid) return;
   var grp=groupMap[mc.gid]; if(grp){grp.cells.forEach(function(p){var m=getCell(p.c,p.r);if(m)delete m.gid;}); delete groupMap[mc.gid];}
@@ -192,37 +189,13 @@ function _doDragMove(toC,toR){
 }
 function _endDragMove(){ dragMoveKey=null; dragMoveOrigin=null; dragMoveMode=false; dragHighlightKey=null; dragTargetCells=[]; dragTargetValid=false; }
 
-// ── Audio ─────────────────────────────────────────────────────────
-var _audioCtx=null, _didPlace=false, _placeCount=0, _audioUnlocked=false;
-
-// 【修正：音】iOSでは touchstart 内で AudioContext を作り resume する
-// さらに短い実音を鳴らしてロックを完全解除する
-function _unlockAudio(){
-  if(_audioUnlocked) return;
-  try{
-    if(!_audioCtx) _audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-    if(_audioCtx.state==='suspended'||_audioCtx.state==='interrupted') _audioCtx.resume();
-    // 無音ではなく超短い微音（音量ゼロでは解除できない場合がある）
-    var buf=_audioCtx.createBuffer(1,_audioCtx.sampleRate*0.001,_audioCtx.sampleRate);
-    var data=buf.getChannelData(0);
-    for(var i=0;i<data.length;i++) data[i]=0.0001;
-    var src=_audioCtx.createBufferSource();
-    src.buffer=buf;
-    var g=_audioCtx.createGain(); g.gain.value=0.001;
-    src.connect(g); g.connect(_audioCtx.destination);
-    src.start(0);
-    _audioUnlocked=true;
-  }catch(e){}
-}
-
+// ── Audio（シンプル版：このチャットで動いていた版）─────────────
+var _audioCtx=null, _didPlace=false, _placeCount=0;
 function _getAudioCtx(){
-  if(!_audioCtx){
-    try{ _audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; }
-  }
-  if(_audioCtx.state==='suspended'||_audioCtx.state==='interrupted') _audioCtx.resume();
+  if(!_audioCtx){try{_audioCtx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){return null;}}
+  if(_audioCtx.state==='suspended') _audioCtx.resume();
   return _audioCtx;
 }
-
 function _mcPlaceSound(pm){
   if(!soundOn) return; var ctx=_getAudioCtx(); if(!ctx) return; pm=pm||1.0;
   try{
@@ -309,7 +282,6 @@ function initInteraction(){
 }
 
 function _onLongPress(c,r,clientX,clientY){
-  lpCircle=null;
   var cell=getCell(c,r); if(!cell) return;
   var ac=c, ar=r;
   if(cell.ghost){ac=cell.anchorC;ar=cell.anchorR;}
@@ -322,22 +294,12 @@ function _onLongPress(c,r,clientX,clientY){
   if(typeof triggerSinkAnim==='function')triggerSinkAnim(ac,ar);
 }
 
-// ── 円を安全に開始 ───────────────────────────────────────────────
-function _startCircleRaf(){
-  if(typeof _startRafLoop==='function') _startRafLoop();
-  else scheduleRender();
-}
-
 function onTouchStart(e){
   e.preventDefault();
-  _unlockAudio(); // ← 最初のタッチでAudio unlock
-
   var ts=e.touches;
   if(ts.length>=2){
-    // 【修正：円】longPressTimer をキャンセルするが lpCircle はそのまま
-    if(longPressTimer){clearTimeout(longPressTimer);longPressTimer=null;}
-    if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;stampCircle=null;}
-    lpCircle=null;
+    cancelLongPress();
+    if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;}
     isPointerDown=false;touchDrawStarted=false;stampedSet=new Set();_endDragMove();isPanning=false;
     var rect=gc.getBoundingClientRect(),d=ptDist(ts[0],ts[1]),mid=ptMid(ts[0],ts[1]);
     isPinching=true;pinch0=d;pinchZoom0=zoom;pinchPanX0=panX;pinchPanY0=panY;
@@ -347,31 +309,19 @@ function onTouchStart(e){
   isPinching=false;
   var t0=ts[0];touchStartX=t0.clientX;touchStartY=t0.clientY;
   var cell=clientToCell(t0.clientX,t0.clientY);hoverC=cell.c;hoverR=cell.r;scheduleRender();
-
   if(isPanMode){ isPanning=true; _lastMouseX=t0.clientX; _lastMouseY=t0.clientY; return; }
   isPanning=false;
-
   if(tool==='fill'){pushUndo();floodFill(cell.c,cell.r);return;}
-
   lpC=cell.c; lpR=cell.r;
-
-  if(getCell(cell.c,cell.r)){
-    lpCircle={c:cell.c,r:cell.r,startTime:performance.now(),duration:480,color:'#f5c842',rad:20};
-    _startCircleRaf();
-  }
   longPressTimer=setTimeout(function(){
     longPressTimer=null;
     _onLongPress(lpC,lpR,touchStartX,touchStartY);
   },480);
-
   isPointerDown=true;touchDrawStarted=false;stampedSet=new Set();stampStartC=cell.c;stampStartR=cell.r;
-
   if(tool==='draw'){
     stampMode=false;
-    stampCircle={c:cell.c,r:cell.r,startTime:performance.now(),duration:STAMP_LONG_MS,color:'#50c8ff',rad:13};
-    _startCircleRaf();
     stampLPTimer=setTimeout(function(){
-      stampMode=true; stampCircle=null;
+      stampMode=true;
       if(vibeOn&&navigator.vibrate)navigator.vibrate([30,60,30]);
       _playAndVibe(); stampLPTimer=null; scheduleRender();
     },STAMP_LONG_MS);
@@ -395,52 +345,37 @@ function onTouchMove(e){
     _lastMouseX=t0pan.clientX; _lastMouseY=t0pan.clientY;
     scheduleRender();return;
   }
-
+  cancelLongPress();
   if(!isPointerDown||ts.length!==1) return;
   var t0=ts[0];
-
-  // 【修正：円】移動距離が閾値を超えた時だけ長押しキャンセル
-  var mdx=t0.clientX-touchStartX, mdy=t0.clientY-touchStartY;
-  var moved=Math.sqrt(mdx*mdx+mdy*mdy);
-  if(moved>=DRAW_THRESHOLD){
-    // 閾値超えたら長押しタイマーをキャンセルして円を消す
-    if(longPressTimer){clearTimeout(longPressTimer);longPressTimer=null;}
-    lpCircle=null;
-  }
-
   if(dragMoveKey){
     var dx=t0.clientX-dragMoveOrigin.x,dy=t0.clientY-dragMoveOrigin.y;
     if(!dragMoveMode&&Math.sqrt(dx*dx+dy*dy)>DRAG_THRESHOLD){
       dragMoveMode=true;closeCtxMenu();
-      if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;stampCircle=null;}
+      if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;}
     }
     if(dragMoveMode){var cell=clientToCell(t0.clientX,t0.clientY);hoverC=cell.c;hoverR=cell.r;_checkDragTarget(cell.c,cell.r);_doDragMove(cell.c,cell.r);}
     scheduleRender();return;
   }
-
+  var dx2=t0.clientX-touchStartX,dy2=t0.clientY-touchStartY;
   var cell=clientToCell(t0.clientX,t0.clientY);hoverC=cell.c;hoverR=cell.r;
-  if(!touchDrawStarted&&moved<DRAW_THRESHOLD){scheduleRender();return;}
+  if(!touchDrawStarted&&Math.sqrt(dx2*dx2+dy2*dy2)<DRAW_THRESHOLD){scheduleRender();return;}
   touchDrawStarted=true;
   if(stampMode) stampedSet=new Set();
   _didPlace=false;
-  handleDraw(cell.c,cell.r); // 【修正：道路】シンプルなhandleDrawに戻す
+  handleDraw(cell.c,cell.r);
   if(_didPlace)_playAndVibe();_didPlace=false;
 }
 
 function onTouchEnd(e){
   e.preventDefault();
-  if(_audioCtx&&_audioCtx.state==='suspended') _audioCtx.resume(); // 追加保険
   if(isPinching){
     if(e.touches.length<2){isPinching=false;isPointerDown=false;touchDrawStarted=false;hoverC=-1;hoverR=-1;scheduleRender();}
     return;
   }
   if(isPanning&&isPanMode){isPanning=false;scheduleRender();return;}
-
-  lpCircle=null;
-  if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;stampCircle=null;}
-  else stampCircle=null;
-  if(longPressTimer){clearTimeout(longPressTimer);longPressTimer=null;}
-
+  cancelLongPress();
+  if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;}
   if(dragMoveKey){
     if(dragMoveMode){
       _playDropSound();if(vibeOn&&navigator.vibrate)navigator.vibrate(18);
@@ -452,7 +387,6 @@ function onTouchEnd(e){
     }
     _endDragMove();isPointerDown=false;touchDrawStarted=false;stampMode=false;_placeCount=0;hoverC=-1;hoverR=-1;scheduleRender();return;
   }
-
   _didPlace=false;
   if(isPointerDown){if(!touchDrawStarted&&!stampMode)handleDraw(stampStartC,stampStartR);commitStamp();}
   if(_didPlace)_playAndVibe();_didPlace=false;if(!stampMode)_placeCount=0;
@@ -460,25 +394,19 @@ function onTouchEnd(e){
 }
 
 function onMouseDown(e){
-  _unlockAudio();
   if(e.button===1||(e.button===0&&isPanMode)){e.preventDefault();isPanning=true;_lastMouseX=e.clientX;_lastMouseY=e.clientY;updateCursor();return;}
   if(e.button!==0) return;
   var cell=clientToCell(e.clientX,e.clientY);
   if(tool==='fill'){pushUndo();floodFill(cell.c,cell.r);return;}
   isPointerDown=true;stampStartC=cell.c;stampStartR=cell.r;stampedSet=new Set();
-
   if(getCell(cell.c,cell.r)){
-    lpCircle={c:cell.c,r:cell.r,startTime:performance.now(),duration:480,color:'#f5c842',rad:20};
-    _startCircleRaf();
     longPressTimer=setTimeout(function(){longPressTimer=null;_onLongPress(cell.c,cell.r,e.clientX,e.clientY);},480);
   }
   handleDraw(cell.c,cell.r);
   if(tool==='draw'){
     stampMode=false;
-    stampCircle={c:cell.c,r:cell.r,startTime:performance.now(),duration:STAMP_LONG_MS,color:'#50c8ff',rad:13};
-    _startCircleRaf();
     stampLPTimer=setTimeout(function(){
-      stampMode=true;stampCircle=null;
+      stampMode=true;
       if(vibeOn&&navigator.vibrate)navigator.vibrate([30,60,30]);
       _playAndVibe();stampLPTimer=null;scheduleRender();
     },STAMP_LONG_MS);
@@ -496,18 +424,10 @@ function onWindowMouseMove(e){
     var dx=e.clientX-dragMoveOrigin.x,dy=e.clientY-dragMoveOrigin.y;
     if(!dragMoveMode&&Math.sqrt(dx*dx+dy*dy)>DRAG_THRESHOLD){
       dragMoveMode=true;closeCtxMenu();
-      if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;stampCircle=null;}
+      if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;}
     }
     if(dragMoveMode&&inside){var cell=clientToCell(e.clientX,e.clientY);hoverC=cell.c;hoverR=cell.r;_checkDragTarget(cell.c,cell.r);_doDragMove(cell.c,cell.r);}
     scheduleRender();return;
-  }
-  // 【修正：円】マウス移動でlpCircleをクリア
-  if(isPointerDown&&(lpCircle||longPressTimer)){
-    var mdx=e.clientX-touchStartX,mdy=e.clientY-touchStartY;
-    if(Math.sqrt(mdx*mdx+mdy*mdy)>=DRAW_THRESHOLD){
-      if(longPressTimer){clearTimeout(longPressTimer);longPressTimer=null;}
-      lpCircle=null;
-    }
   }
   if(!inside){if(hoverC>=0){hoverC=-1;hoverR=-1;scheduleRender();}if(isPointerDown){commitStamp();isPointerDown=false;}return;}
   var cell=clientToCell(e.clientX,e.clientY);hoverC=cell.c;hoverR=cell.r;
@@ -521,10 +441,8 @@ function onWindowMouseMove(e){
 }
 
 function onWindowMouseUp(e){
-  lpCircle=null;
-  if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;stampCircle=null;}
-  else stampCircle=null;
-  if(longPressTimer){clearTimeout(longPressTimer);longPressTimer=null;}
+  cancelLongPress();
+  if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;}
   stampMode=false;
   if(isPanning){isPanning=false;updateCursor();return;}
   if(dragMoveKey){
@@ -558,8 +476,4 @@ function handleDraw(c,r){
   lastC=c;lastR=r;
 }
 function commitStamp(){stampedSet=new Set();undoPushed=false;}
-// 【修正：円】cancelLongPress は lpCircle を消さない
-// lpCircle は「移動閾値超え」か「touch終了」の時だけ消す
-function cancelLongPress(){
-  if(longPressTimer){clearTimeout(longPressTimer);longPressTimer=null;}
-}
+function cancelLongPress(){if(longPressTimer){clearTimeout(longPressTimer);longPressTimer=null;}}
