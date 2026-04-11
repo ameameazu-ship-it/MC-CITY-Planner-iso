@@ -1,5 +1,5 @@
 /**
- * iso-engine.js - with sink animation + drag flash + long-press progress circles
+ * iso-engine.js - with sink animation + drag flash
  */
 
 var cells={},panX=0,panY=0,zoom=DEFAULT_ZOOM;
@@ -13,9 +13,10 @@ function _popScale(t){if(t<=0)return 0;if(t>=1)return 1;if(t<0.5){var u=t/0.5;re
 function getBlockScale(c,r){var key=ck(c,r);if(!blockAnims[key])return 1;var e=performance.now()-blockAnims[key];if(e>=ANIM_DURATION){delete blockAnims[key];return 1;}return _popScale(e/ANIM_DURATION);}
 
 // ★ 沈み込みアニメ
-var sinkAnims={};
-var SINK_DURATION=450;
-var SINK_DEPTH=0.65;
+// 長押し成功時：ブロックが少し下に沈んでから戻る（ゆっくり沈んで素早く戻る）
+var sinkAnims={};        // ck -> startTime
+var SINK_DURATION=450;   // ms
+var SINK_DEPTH=0.65;     // セル高さに対する沈み込み量（約10px@zoom1.1）
 
 function triggerSinkAnim(c,r){
   var cell=getCell(c,r);if(!cell)return;
@@ -28,6 +29,8 @@ function triggerSinkAnim(c,r){
   _startRafLoop();
 }
 
+// 沈み込みオフセット（y方向ピクセル）を返す
+// 0→最大沈み込み→0 の曲線（前半ゆっくり沈む、後半素早く戻る）
 function getSinkOffset(c,r){
   var key=ck(c,r);if(!sinkAnims[key])return 0;
   var elapsed=performance.now()-sinkAnims[key];
@@ -35,18 +38,20 @@ function getSinkOffset(c,r){
   var t=elapsed/SINK_DURATION;
   var offset;
   if(t<0.25){
+    // 前半：素早く深く沈む（ease-in cubic）
     var u=t/0.25;
     offset=SINK_DEPTH*(u*u*u);
   } else {
+    // 後半：ゆっくり戻る（ease-out quad）
     var u=(t-0.25)/0.75;
     offset=SINK_DEPTH*(1-u*u);
   }
-  return offset * HH * zoom;
+  return offset * HH * zoom;  // ピクセル換算
 }
 
-// ★ グループ化アニメ
-var groupFormedAnims={};
-var GROUP_FORMED_DURATION=900;
+// ★ グループ化アニメ（合体した瞬間だけ表示）
+var groupFormedAnims={};       // gid -> {startTime, label, cells, id}
+var GROUP_FORMED_DURATION=900; // ms：ラベルが消えるまでの時間
 
 function triggerGroupFormed(gid, label, cells2){
   groupFormedAnims[gid]={
@@ -57,8 +62,7 @@ function triggerGroupFormed(gid, label, cells2){
   };
   _startRafLoop();
 }
-
-// ★ ドロップ可否フィードバック
+// ★ ドロップ可否フィードバック（ふわっと上に消えるアニメ）
 var dropFeedbackAnim=null;
 var DROP_FEEDBACK_DURATION=700;
 
@@ -87,50 +91,11 @@ function _getFlashAlpha(){
   return Math.max(0,Math.sin(t*Math.PI*FLASH_PULSES))*0.80;
 }
 
-// ★ 長押し進捗円の描画
-// obj: {c, r, startTime, duration, color, rad}
-// 戻り値: まだアニメ中なら true
-function _drawProgressCircle(obj){
-  if(!obj) return false;
-  var elapsed=performance.now()-obj.startTime;
-  var prog=Math.min(1,elapsed/obj.duration);
-  var s=cellToScreen(obj.c,obj.r);
-  var cx2=s.x, cy2=s.y+HH*zoom;  // セル中央
-  var radius=(obj.rad||20)*zoom;
-  var startAngle=-Math.PI/2;
-  var endAngle=startAngle+Math.PI*2*prog;
-  gctx.save();
-  gctx.lineCap='round';
-  // 背景リング（薄い黒）
-  gctx.beginPath();
-  gctx.arc(cx2,cy2,radius,0,Math.PI*2);
-  gctx.strokeStyle='rgba(0,0,0,0.38)';
-  gctx.lineWidth=5*zoom;
-  gctx.stroke();
-  // 進捗弧
-  if(prog>0.01){
-    gctx.beginPath();
-    gctx.arc(cx2,cy2,radius,startAngle,endAngle);
-    gctx.strokeStyle=obj.color;
-    gctx.lineWidth=3.5*zoom;
-    gctx.stroke();
-  }
-  gctx.restore();
-  return prog<1;
-}
-
 // RAF loop
 var _rafLoopRunning=false;
 function _startRafLoop(){if(_rafLoopRunning)return;_rafLoopRunning=true;requestAnimationFrame(_rafLoop);}
 function _rafLoop(){
-  var needMore=
-    Object.keys(blockAnims).length>0 ||
-    Object.keys(sinkAnims).length>0 ||
-    dragFlashCells.length>0 ||
-    Object.keys(groupFormedAnims).length>0 ||
-    dropFeedbackAnim!==null ||
-    (typeof lpCircle!=='undefined'&&lpCircle!==null) ||
-    (typeof stampCircle!=='undefined'&&stampCircle!==null);
+  var needMore=Object.keys(blockAnims).length>0||Object.keys(sinkAnims).length>0||dragFlashCells.length>0||Object.keys(groupFormedAnims).length>0||dropFeedbackAnim!==null;
   dirty=true;_renderNow();
   if(needMore)requestAnimationFrame(_rafLoop);else _rafLoopRunning=false;
 }
@@ -189,7 +154,7 @@ function _renderNow(){
   // Pass 2: ブロック（ゴーストスキップ・固定サイズはスケーリング）
   tileList.forEach(function(cr){
     var c=cr[0],r=cr[1],cell=getCell(c,r); if(!cell) return;
-    if(cell.ghost) return;
+    if(cell.ghost) return; // ゴーストはアンカーで描画済みのためスキップ
 
     var b=BLOCKS[cell.id];
     var gW=(b&&b.gridW)||1, gH=(b&&b.gridH)||1;
@@ -199,6 +164,7 @@ function _renderNow(){
     var animScale=getBlockScale(c,r);
 
     if(gW>1||gH>1){
+      // 固定サイズブロック：フットプリント中央を軸に拡大描画
       var midC=c+(gW-1)/2, midR=r+(gH-1)/2;
       var midS=cellToScreen(midC,midR);
       var blockScale=Math.sqrt(gW*gH);
@@ -218,7 +184,8 @@ function _renderNow(){
     }
   });
 
-  // ── Pass 3: グループ化アニメ ──────────────────────────────────
+  // ── Pass 3: グループ化アニメ（合体した瞬間だけラベル表示）────
+  // ドラッグ中（dragMoveKey がある間）は一切表示しない
   var now3=performance.now();
   var activeFlash=false;
   var isDragging=(typeof dragMoveKey!=='undefined'&&dragMoveKey!==null);
@@ -226,41 +193,46 @@ function _renderNow(){
   if(!isDragging){
     Object.keys(groupFormedAnims).forEach(function(gid){
       var anim=groupFormedAnims[gid];
-      var elapsed=now3-anim.startTime;
-      if(elapsed>=GROUP_FORMED_DURATION){ delete groupFormedAnims[gid]; return; }
-      activeFlash=true;
-      var t=elapsed/GROUP_FORMED_DURATION;
-      var alpha = t<0.3 ? (t/0.3) : (1-(t-0.3)/0.7);
-      alpha = Math.max(0,Math.min(1,alpha));
+    var anim=groupFormedAnims[gid];
+    var elapsed=now3-anim.startTime;
+    if(elapsed>=GROUP_FORMED_DURATION){ delete groupFormedAnims[gid]; return; }
+    activeFlash=true;
+    var t=elapsed/GROUP_FORMED_DURATION;
+    // フェード：0→0.3で出現、0.3→1.0で消える
+    var alpha = t<0.3 ? (t/0.3) : (1-(t-0.3)/0.7);
+    alpha = Math.max(0,Math.min(1,alpha));
 
-      anim.cells.forEach(function(pos){
-        var s=cellToScreen(pos.c,pos.r);
-        drawDiamond(gctx,s.x,s.y,
-          'rgba(245,200,66,'+(alpha*0.35)+')',
-          'rgba(245,200,66,'+alpha+')', 2.5);
-      });
-
-      var cells2=anim.cells;
-      var minC=cells2[0].c,maxC=cells2[0].c,minR=cells2[0].r,maxR=cells2[0].r;
-      for(var i=1;i<cells2.length;i++){if(cells2[i].c<minC)minC=cells2[i].c;if(cells2[i].c>maxC)maxC=cells2[i].c;if(cells2[i].r<minR)minR=cells2[i].r;if(cells2[i].r>maxR)maxR=cells2[i].r;}
-      var midC=(minC+maxC)/2, midR=(minR+maxR)/2;
-      var midS=cellToScreen(midC,midR);
-      var floatY = -20*zoom * (t<0.3 ? t/0.3 : 1.0);
-      var bh=BLOCKS[anim.id]?BLOCKS[anim.id].bh:30;
-      var lx=midS.x, ly=midS.y-bh*zoom+floatY;
-      var fs=Math.max(11,Math.min(20,zoom*15));
-      gctx.save();
-      gctx.globalAlpha=alpha;
-      gctx.font='bold '+fs+'px sans-serif';
-      gctx.textAlign='center'; gctx.textBaseline='bottom';
-      var tw=gctx.measureText(anim.label).width;
-      gctx.fillStyle='rgba(0,0,0,0.75)';
-      gctx.fillRect(lx-tw/2-5,ly-fs-3,tw+10,fs+6);
-      gctx.fillStyle='#f5c842';
-      gctx.fillText(anim.label,lx,ly);
-      gctx.restore();
+    // 枠（合体したセルを一瞬ゴールドで囲む）
+    anim.cells.forEach(function(pos){
+      var s=cellToScreen(pos.c,pos.r);
+      drawDiamond(gctx,s.x,s.y,
+        'rgba(245,200,66,'+(alpha*0.35)+')',
+        'rgba(245,200,66,'+alpha+')', 2.5);
     });
-  }
+
+    // ラベル（グループ中央・上に浮かび上がる）
+    var cells2=anim.cells;
+    var minC=cells2[0].c,maxC=cells2[0].c,minR=cells2[0].r,maxR=cells2[0].r;
+    for(var i=1;i<cells2.length;i++){if(cells2[i].c<minC)minC=cells2[i].c;if(cells2[i].c>maxC)maxC=cells2[i].c;if(cells2[i].r<minR)minR=cells2[i].r;if(cells2[i].r>maxR)maxR=cells2[i].r;}
+    var midC=(minC+maxC)/2, midR=(minR+maxR)/2;
+    var midS=cellToScreen(midC,midR);
+    // 上に浮かび上がるオフセット
+    var floatY = -20*zoom * (t<0.3 ? t/0.3 : 1.0);
+    var bh=BLOCKS[anim.id]?BLOCKS[anim.id].bh:30;
+    var lx=midS.x, ly=midS.y-bh*zoom+floatY;
+    var fs=Math.max(11,Math.min(20,zoom*15));
+    gctx.save();
+    gctx.globalAlpha=alpha;
+    gctx.font='bold '+fs+'px sans-serif';
+    gctx.textAlign='center'; gctx.textBaseline='bottom';
+    var tw=gctx.measureText(anim.label).width;
+    gctx.fillStyle='rgba(0,0,0,0.75)';
+    gctx.fillRect(lx-tw/2-5,ly-fs-3,tw+10,fs+6);
+    gctx.fillStyle='#f5c842';
+    gctx.fillText(anim.label,lx,ly);
+    gctx.restore();
+  });
+  } // end !isDragging
   if(activeFlash) _startRafLoop();
 
   // Pass 4: ドラッグフラッシュ
@@ -277,6 +249,7 @@ function _renderNow(){
   if(typeof dragMoveMode!=='undefined'&&dragMoveMode&&
      typeof dragTargetCells!=='undefined'&&dragTargetCells.length>0){
     var isValid=(typeof dragTargetValid!=='undefined')&&dragTargetValid;
+    // ドラッグ中：色枠のみ（ラベルなし）
     dragTargetCells.forEach(function(pos){
       if(!inGrid(pos.c,pos.r)) return;
       var s=cellToScreen(pos.c,pos.r);
@@ -287,6 +260,7 @@ function _renderNow(){
       }
     });
   } else if(typeof dragHighlightKey!=='undefined'&&dragHighlightKey&&!(typeof dragMoveMode!=='undefined'&&dragMoveMode)){
+    // ドラッグ準備中（まだ動かしていない）：オレンジハイライト
     var dp=dragHighlightKey.split(','),dhC=parseInt(dp[0]),dhR=parseInt(dp[1]);
     var dhCell=getCell(dhC,dhR),dhKeys=[];
     if(dhCell&&dhCell.gid&&typeof groupMap!=='undefined'&&groupMap[dhCell.gid])groupMap[dhCell.gid].cells.forEach(function(p){dhKeys.push({c:p.c,r:p.r});});
@@ -294,7 +268,7 @@ function _renderNow(){
     dhKeys.forEach(function(pos){var s=cellToScreen(pos.c,pos.r);drawDiamond(gctx,s.x,s.y,'rgba(255,200,50,0.25)','rgba(255,200,50,0.90)',2.2);});
   }
 
-  // ── Pass 6: ドロップ後フィードバック ─────────────────────────
+  // ── Pass 6: ドロップ後フィードバック（ふわっと上に消える）────
   if(dropFeedbackAnim){
     var dfa=dropFeedbackAnim;
     var dfElapsed=performance.now()-dfa.startTime;
@@ -302,9 +276,10 @@ function _renderNow(){
       dropFeedbackAnim=null;
     } else {
       var dft=dfElapsed/DROP_FEEDBACK_DURATION;
+      // フェード＋上に浮かぶ：0→0.2で出現、0.2→1.0で消えながら上昇
       var dfAlpha=dft<0.2?(dft/0.2):(1-(dft-0.2)/0.8);
       dfAlpha=Math.max(0,dfAlpha);
-      var dfFloatY=-35*zoom*dft;
+      var dfFloatY=-35*zoom*dft;  // 上に35px浮かぶ
       var dfs=Math.max(14,Math.min(24,zoom*18));
       gctx.save();
       gctx.globalAlpha=dfAlpha;
@@ -318,14 +293,6 @@ function _renderNow(){
       gctx.fillText(dfa.label,dfx,dfy);
       gctx.restore();
     }
-  }
-
-  // ── Pass 7: 長押し進捗円（lpCircle / stampCircle）────────────
-  // ドラッグ中は表示しない
-  if(!isDragging){
-    var _lpcAlive=(typeof lpCircle!=='undefined')&&_drawProgressCircle(lpCircle);
-    var _spcAlive=(typeof stampCircle!=='undefined')&&_drawProgressCircle(stampCircle);
-    if(_lpcAlive||_spcAlive) _startRafLoop();
   }
 
   // Hover
