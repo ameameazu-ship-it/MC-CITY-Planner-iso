@@ -9,8 +9,8 @@ var dragHighlightKey=null, dragTargetCells=[], dragTargetValid=false;
 var isPinching=false, pinch0=0, pinchZoom0=1, pinchPanX0=0, pinchPanY0=0, pinchMid0X=0, pinchMid0Y=0;
 var touchDrawStarted=false, touchStartX=0, touchStartY=0, DRAW_THRESHOLD=10;
 var isPanMode=false, isPanning=false, _lastMouseX=0, _lastMouseY=0;
-var lpCircle=null;    // 長押し移動 進捗円
-var stampCircle=null; // スタンプ進捗円
+var lpCircle=null;
+var stampCircle=null;
 
 // ── Group / Merge（2×2のみ）─────────────────────────────────────
 var groupMap={}, nextGid=1;
@@ -36,7 +36,6 @@ function _isRoadSelected(){
 }
 
 // ── stampStartから8方向スナップ ──────────────────────────────────
-// 【修正】stampMode不問で道路は常にスナップ適用
 function _snapRoadCell(c,r){
   if(stampStartC<0||stampStartR<0) return {c:c,r:r};
   var dc=c-stampStartC, dr=r-stampStartR;
@@ -49,17 +48,26 @@ function _snapRoadCell(c,r){
   return {c:stampStartC+Math.round(cosS*dot), r:stampStartR+Math.round(sinS*dot)};
 }
 
-// ── Bresenham補間 ─────────────────────────────────────────────────
-function _drawLineTo(c0,r0,c1,r1){
+// ── 【修正2】道路Bresenham: placeCell を直接呼ぶ ─────────────────
+// handleDraw を経由すると stampMode=false 時に2セル目でreturnされるため
+function _handleRoadDraw(cellC, cellR){
+  var snapped = _snapRoadCell(cellC, cellR);
+  var fromC = (lastC>=0) ? lastC : stampStartC;
+  var fromR = (lastR>=0) ? lastR : stampStartR;
+  var c0=fromC, r0=fromR, c1=snapped.c, r1=snapped.r;
   var dc=Math.abs(c1-c0), dr_=Math.abs(r1-r0);
   var sc=(c0<c1)?1:(c0>c1?-1:0), sr=(r0<r1)?1:(r0>r1?-1:0);
   var err=dc-dr_, steps=0;
+  if(!undoPushed){ pushUndo(); undoPushed=true; }
   while(steps++<300){
-    handleDraw(c0,r0);
+    if(inGrid(c0,r0)){
+      if(placeCell(c0,r0)) _didPlace=true;
+      lastC=c0; lastR=r0;
+    }
     if(c0===c1&&r0===r1) break;
     var e2=2*err;
-    if(e2>-dr_){err-=dr_;c0+=sc;}
-    if(e2<dc){err+=dc;r0+=sr;}
+    if(e2>-dr_){ err-=dr_; c0+=sc; }
+    if(e2<dc){  err+=dc;  r0+=sr; }
   }
 }
 
@@ -97,7 +105,6 @@ function _dissolveGroup(c,r){
   var mc=getCell(c,r); if(!mc||!mc.gid) return;
   var grp=groupMap[mc.gid]; if(grp){grp.cells.forEach(function(p){var m=getCell(p.c,p.r);if(m)delete m.gid;}); delete groupMap[mc.gid];}
 }
-
 function clearAllCells(){ cells={}; groupMap={}; nextGid=1; scheduleRender(); }
 
 function _getFixedCells(anchorC,anchorR,gW,gH){
@@ -178,7 +185,6 @@ function _startDragMove(k,cx,cy){
   dragMoveKey=k; dragMoveOrigin={x:cx,y:cy}; dragMoveMode=false;
   dragHighlightKey=k; dragTargetCells=[]; dragTargetValid=false; scheduleRender();
 }
-
 function _getDragMoveCells(srcC,srcR,srcCell){
   var b=BLOCKS[srcCell.id];
   var gW=(b&&b.gridW)||1, gH=(b&&b.gridH)||1;
@@ -186,7 +192,6 @@ function _getDragMoveCells(srcC,srcR,srcCell){
   if(srcCell.gid&&groupMap[srcCell.gid]) return groupMap[srcCell.gid].cells.map(function(p){return{c:p.c,r:p.r};});
   return [{c:srcC,r:srcR}];
 }
-
 function _checkDragTarget(toC,toR){
   dragTargetCells=[]; dragTargetValid=false;
   if(!dragMoveKey) return;
@@ -201,7 +206,6 @@ function _checkDragTarget(toC,toR){
   for(var i=0;i<destCells.length;i++){var dk=ck(destCells[i].c,destCells[i].r);if(!srcKeys[dk]&&cells[dk])return;}
   dragTargetValid=true;
 }
-
 function _doDragMove(toC,toR){
   if(!dragMoveKey) return;
   var sp=dragMoveKey.split(','),srcC=parseInt(sp[0]),srcR=parseInt(sp[1]);
@@ -233,16 +237,29 @@ function _doDragMove(toC,toR){
   }
   dragMoveKey=ck(newAnchorC,newAnchorR); dragHighlightKey=dragMoveKey; scheduleRender();
 }
-
 function _endDragMove(){ dragMoveKey=null; dragMoveOrigin=null; dragMoveMode=false; dragHighlightKey=null; dragTargetCells=[]; dragTargetValid=false; }
 
 // ── Audio ─────────────────────────────────────────────────────────
 var _audioCtx=null, _didPlace=false, _placeCount=0;
 
-// 【修正1】AudioContextをタッチ/クリック開始時に即座にresumeする
-function _resumeAudio(){
-  if(!_audioCtx) return;
-  if(_audioCtx.state==='suspended'||_audioCtx.state==='interrupted') _audioCtx.resume();
+// 【修正3】iOS音対策：タッチ開始時に無音再生でAudioContextをunlockする
+function _unlockAudio(){
+  if(_audioCtx){
+    if(_audioCtx.state==='suspended'||_audioCtx.state==='interrupted'){
+      _audioCtx.resume();
+    }
+    return;
+  }
+  try{
+    _audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    // 無音バッファを再生してiOSのロックを解除
+    var buf = _audioCtx.createBuffer(1,1,22050);
+    var src = _audioCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(_audioCtx.destination);
+    src.start(0);
+    if(_audioCtx.state==='suspended') _audioCtx.resume();
+  }catch(e){}
 }
 
 function _getAudioCtx(){
@@ -251,14 +268,6 @@ function _getAudioCtx(){
   }
   if(_audioCtx.state!=='running') _audioCtx.resume();
   return _audioCtx;
-}
-
-// iOS用：最初のタッチで必ずAudioContextを初期化・再開する
-function _initAudioOnTouch(){
-  if(!_audioCtx){
-    try{ _audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; }
-  }
-  if(_audioCtx.state==='suspended') _audioCtx.resume();
 }
 
 function _mcPlaceSound(pm){
@@ -275,7 +284,6 @@ function _mcPlaceSound(pm){
     b2.connect(bg);bg.connect(out);b2.start(t);b2.stop(t+0.04);
   }catch(e){}
 }
-
 function _playLongPressSound(){
   if(!soundOn) return; var ctx=_getAudioCtx(); if(!ctx) return;
   try{
@@ -293,7 +301,6 @@ function _playLongPressSound(){
     n.connect(lp);lp.connect(ng);ng.connect(out);n.start(t);n.stop(t+0.06);
   }catch(e){}
 }
-
 function _playDropSound(){
   if(!soundOn) return; var ctx=_getAudioCtx(); if(!ctx) return;
   try{
@@ -308,7 +315,6 @@ function _playDropSound(){
     n.connect(lp);lp.connect(ng);ng.connect(out);n.start(t);n.stop(t+0.06);
   }catch(e){}
 }
-
 function _playSingleSound(){_mcPlaceSound(0.92+Math.random()*0.16);}
 var _stampPitches=[1.00,1.05,0.97,1.08,0.95,1.03,1.10,0.98];
 function _playStampSound(){_mcPlaceSound(_stampPitches[_placeCount%_stampPitches.length]);}
@@ -326,12 +332,10 @@ function ptMid(a,b){return{x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2};
 function setTool(t2){tool=t2;['draw','erase','fill'].forEach(function(tt){var b=document.getElementById('tool-'+tt);if(b)b.classList.toggle('active',tt===t2);});}
 function updateCursor(){if(!gc)return;gc.style.cursor=isPanning?'grabbing':(isPanMode?'grab':'crosshair');}
 function togglePanMode(){isPanMode=!isPanMode;var btn=document.getElementById('btn-center');if(btn)btn.classList.toggle('on',isPanMode);updateCursor();}
-
 function _on(id,ev,fn){ var el=document.getElementById(id); if(el) el.addEventListener(ev,fn); }
 
 function initInteraction(){
-  var wrap=document.getElementById('canvas-wrap');
-  if(!wrap) return;
+  var wrap=document.getElementById('canvas-wrap'); if(!wrap) return;
   wrap.addEventListener('touchstart',onTouchStart,{passive:false});
   wrap.addEventListener('touchmove',onTouchMove,{passive:false});
   wrap.addEventListener('touchend',onTouchEnd,{passive:false});
@@ -352,6 +356,12 @@ function initInteraction(){
   updateCursor(); updateUndoBtns();
 }
 
+// 【修正1】_startRafLoopを安全に呼ぶヘルパー
+function _safeStartRafLoop(){
+  if(typeof _startRafLoop==='function') _startRafLoop();
+  else scheduleRender();
+}
+
 function _onLongPress(c,r,clientX,clientY){
   lpCircle=null;
   var cell=getCell(c,r); if(!cell) return;
@@ -366,20 +376,9 @@ function _onLongPress(c,r,clientX,clientY){
   if(typeof triggerSinkAnim==='function')triggerSinkAnim(ac,ar);
 }
 
-// ── 道路描画ヘルパー（TouchMove/MouseMove 共通）──────────────────
-// 【修正2】stampMode 不問で道路はスナップ＋Bresenham 適用
-function _handleRoadDraw(cellC, cellR){
-  stampedSet=new Set();
-  var snapped=_snapRoadCell(cellC,cellR);
-  var fromC=(lastC>=0)?lastC:stampStartC;
-  var fromR=(lastR>=0)?lastR:stampStartR;
-  _drawLineTo(fromC,fromR,snapped.c,snapped.r);
-}
-
 function onTouchStart(e){
   e.preventDefault();
-  // 【修正3】iOSでの音のためにタッチ開始時にAudioContextを初期化
-  _initAudioOnTouch();
+  _unlockAudio(); // 【修正3】最初のタッチでAudioContextをunlock
 
   var ts=e.touches;
   if(ts.length>=2){
@@ -402,10 +401,9 @@ function onTouchStart(e){
 
   lpC=cell.c; lpR=cell.r;
 
-  // 【修正4】_startRafLoopが iso-engine.js で定義されているか確認して呼ぶ
   if(getCell(cell.c,cell.r)){
     lpCircle={c:cell.c,r:cell.r,startTime:performance.now(),duration:480,color:'#f5c842',rad:20};
-    if(typeof _startRafLoop==='function') _startRafLoop();
+    _safeStartRafLoop();
   }
   longPressTimer=setTimeout(function(){
     longPressTimer=null;
@@ -413,16 +411,16 @@ function onTouchStart(e){
   },480);
 
   isPointerDown=true;touchDrawStarted=false;stampedSet=new Set();stampStartC=cell.c;stampStartR=cell.r;
+  lastC=-1;lastR=-1; // 道路スナップのためリセット
 
   if(tool==='draw'){
     stampMode=false;
     stampCircle={c:cell.c,r:cell.r,startTime:performance.now(),duration:STAMP_LONG_MS,color:'#50c8ff',rad:13};
-    if(typeof _startRafLoop==='function') _startRafLoop();
+    _safeStartRafLoop();
     stampLPTimer=setTimeout(function(){
       stampMode=true; stampCircle=null;
       if(vibeOn&&navigator.vibrate)navigator.vibrate([30,60,30]);
-      _playAndVibe(); stampLPTimer=null;
-      scheduleRender();
+      _playAndVibe(); stampLPTimer=null; scheduleRender();
     },STAMP_LONG_MS);
   }
 }
@@ -460,11 +458,9 @@ function onTouchMove(e){
   var cell=clientToCell(t0.clientX,t0.clientY);hoverC=cell.c;hoverR=cell.r;
   if(!touchDrawStarted&&Math.sqrt(dx2*dx2+dy2*dy2)<DRAW_THRESHOLD){scheduleRender();return;}
   touchDrawStarted=true;
-
   _didPlace=false;
-  // 【修正2】道路はstampMode不問でスナップ適用
   if(tool==='draw'&&_isRoadSelected()){
-    _handleRoadDraw(cell.c,cell.r);
+    _handleRoadDraw(cell.c,cell.r); // 【修正2】道路は直接Bresenham
   } else {
     if(stampMode) stampedSet=new Set();
     handleDraw(cell.c,cell.r);
@@ -479,12 +475,10 @@ function onTouchEnd(e){
     return;
   }
   if(isPanning&&isPanMode){isPanning=false;scheduleRender();return;}
-
   lpCircle=null;
   if(stampLPTimer){clearTimeout(stampLPTimer);stampLPTimer=null;stampCircle=null;}
   else stampCircle=null;
   cancelLongPress();
-
   if(dragMoveKey){
     if(dragMoveMode){
       _playDropSound();if(vibeOn&&navigator.vibrate)navigator.vibrate(18);
@@ -496,7 +490,6 @@ function onTouchEnd(e){
     }
     _endDragMove();isPointerDown=false;touchDrawStarted=false;stampMode=false;_placeCount=0;hoverC=-1;hoverR=-1;scheduleRender();return;
   }
-
   _didPlace=false;
   if(isPointerDown){if(!touchDrawStarted&&!stampMode)handleDraw(stampStartC,stampStartR);commitStamp();}
   if(_didPlace)_playAndVibe();_didPlace=false;if(!stampMode)_placeCount=0;
@@ -504,32 +497,27 @@ function onTouchEnd(e){
 }
 
 function onMouseDown(e){
-  // 【修正3】マウスでも AudioContext を初期化
-  _initAudioOnTouch();
-
+  _unlockAudio(); // 【修正3】
   if(e.button===1||(e.button===0&&isPanMode)){e.preventDefault();isPanning=true;_lastMouseX=e.clientX;_lastMouseY=e.clientY;updateCursor();return;}
   if(e.button!==0) return;
   var cell=clientToCell(e.clientX,e.clientY);
   if(tool==='fill'){pushUndo();floodFill(cell.c,cell.r);return;}
   isPointerDown=true;stampStartC=cell.c;stampStartR=cell.r;stampedSet=new Set();
-
+  lastC=-1;lastR=-1;
   if(getCell(cell.c,cell.r)){
     lpCircle={c:cell.c,r:cell.r,startTime:performance.now(),duration:480,color:'#f5c842',rad:20};
-    if(typeof _startRafLoop==='function') _startRafLoop();
+    _safeStartRafLoop();
     longPressTimer=setTimeout(function(){longPressTimer=null;_onLongPress(cell.c,cell.r,e.clientX,e.clientY);},480);
   }
-
   handleDraw(cell.c,cell.r);
-
   if(tool==='draw'){
     stampMode=false;
     stampCircle={c:cell.c,r:cell.r,startTime:performance.now(),duration:STAMP_LONG_MS,color:'#50c8ff',rad:13};
-    if(typeof _startRafLoop==='function') _startRafLoop();
+    _safeStartRafLoop();
     stampLPTimer=setTimeout(function(){
       stampMode=true;stampCircle=null;
       if(vibeOn&&navigator.vibrate)navigator.vibrate([30,60,30]);
-      _playAndVibe();stampLPTimer=null;
-      scheduleRender();
+      _playAndVibe();stampLPTimer=null;scheduleRender();
     },STAMP_LONG_MS);
   }
 }
@@ -554,7 +542,6 @@ function onWindowMouseMove(e){
   var cell=clientToCell(e.clientX,e.clientY);hoverC=cell.c;hoverR=cell.r;
   if(isPointerDown){
     _didPlace=false;
-    // 【修正2】道路はstampMode不問でスナップ適用
     if(tool==='draw'&&_isRoadSelected()){
       _handleRoadDraw(cell.c,cell.r);
     } else {
@@ -603,4 +590,8 @@ function handleDraw(c,r){
   lastC=c;lastR=r;
 }
 function commitStamp(){stampedSet=new Set();undoPushed=false;}
-function cancelLongPress(){if(longPressTimer){clearTimeout(longPressTimer);longPressTimer=null;}lpCircle=null;if(typeof scheduleRender==='function')scheduleRender();}
+function cancelLongPress(){
+  if(longPressTimer){clearTimeout(longPressTimer);longPressTimer=null;}
+  lpCircle=null;
+  scheduleRender();
+}
