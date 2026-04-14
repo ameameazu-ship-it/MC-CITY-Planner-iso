@@ -16,7 +16,7 @@ var I18N = {
     confirm_clear:'マップをクリアしますか？',
     confirm_load:' を読み込みますか？現在の作業は消えます。',
     confirm_del:' を削除しますか？',
-    no_saves:'保存済みマップなし', selected:'選択中',
+    no_saves:'保存済みマップなし', selected:'選択中', load:'読込', save_fail:'保存に失敗しました（容量不足の可能性があります）',
     direction:'向き', auto:'自動', delete:'🗑 削除', save_ph:'マップ名...',
     s_night:'🌙 夜間モード', s_night_desc:'夜景・照明エフェクト',
     s_sound:'🔊 配置音',     s_sound_desc:'ブロック配置時の効果音',
@@ -34,7 +34,7 @@ var I18N = {
     confirm_clear:'Clear the map?',
     confirm_load:' — load this map? Current work will be lost.',
     confirm_del:' — delete?',
-    no_saves:'No saved maps', selected:'Selected',
+    no_saves:'No saved maps', selected:'Selected', load:'Load', save_fail:'Save failed (storage may be full)',
     direction:'Direction', auto:'Auto', delete:'🗑 Delete', save_ph:'Map name...',
     s_night:'🌙 Night Mode',  s_night_desc:'Night view & lighting effects',
     s_sound:'🔊 Sound',       s_sound_desc:'Sound effect on block placement',
@@ -52,7 +52,7 @@ var I18N = {
     confirm_clear:'清除地图？',
     confirm_load:' — 加载此地图？当前内容将丢失。',
     confirm_del:' — 删除？',
-    no_saves:'无保存地图', selected:'已选',
+    no_saves:'无保存地图', selected:'已选', load:'加载', save_fail:'保存失败（存储空间可能已满）',
     direction:'方向', auto:'自动', delete:'🗑 删除', save_ph:'地图名...',
     s_night:'🌙 夜间模式',   s_night_desc:'夜景与照明效果',
     s_sound:'🔊 音效',       s_sound_desc:'放置方块时的音效',
@@ -70,7 +70,7 @@ var I18N = {
     confirm_clear:'맵을 지울까요?',
     confirm_load:' — 이 맵을 불러올까요? 현재 작업이 사라집니다.',
     confirm_del:' — 삭제?',
-    no_saves:'저장된 맵 없음', selected:'선택',
+    no_saves:'저장된 맵 없음', selected:'선택', load:'불러오기', save_fail:'저장 실패（저장공간 부족 가능）',
     direction:'방향', auto:'자동', delete:'🗑 삭제', save_ph:'맵 이름...',
     s_night:'🌙 야간 모드',  s_night_desc:'야경 및 조명 효과',
     s_sound:'🔊 효과음',     s_sound_desc:'블록 배치 시 효과음',
@@ -88,7 +88,7 @@ var I18N = {
     confirm_clear:'¿Limpiar el mapa?',
     confirm_load:' — ¿Cargar este mapa? Se perderá el trabajo actual.',
     confirm_del:' — ¿Eliminar?',
-    no_saves:'Sin mapas guardados', selected:'Selec.',
+    no_saves:'Sin mapas guardados', selected:'Selec.', load:'Cargar', save_fail:'Error al guardar (almacenamiento lleno)',
     direction:'Dirección', auto:'Auto', delete:'🗑 Eliminar', save_ph:'Nombre del mapa...',
     s_night:'🌙 Modo noche',  s_night_desc:'Vista nocturna e iluminación',
     s_sound:'🔊 Sonido',      s_sound_desc:'Efecto al colocar bloques',
@@ -106,7 +106,7 @@ var I18N = {
     confirm_clear:'Effacer la carte ?',
     confirm_load:' — Charger cette carte ? Le travail actuel sera perdu.',
     confirm_del:' — Supprimer ?',
-    no_saves:'Aucune carte sauvegardée', selected:'Sélect.',
+    no_saves:'Aucune carte sauvegardée', selected:'Sélect.', load:'Charger', save_fail:'Échec de sauvegarde (stockage plein)',
     direction:'Direction', auto:'Auto', delete:'🗑 Supprimer', save_ph:'Nom de la carte...',
     s_night:'🌙 Mode nuit',    s_night_desc:'Vue nocturne et effets lumineux',
     s_sound:'🔊 Son',          s_sound_desc:'Effet sonore lors du placement',
@@ -124,7 +124,7 @@ var I18N = {
     confirm_clear:'Hapus peta?',
     confirm_load:' — Muat peta ini? Pekerjaan saat ini akan hilang.',
     confirm_del:' — Hapus?',
-    no_saves:'Tidak ada peta tersimpan', selected:'Dipilih',
+    no_saves:'Tidak ada peta tersimpan', selected:'Dipilih', load:'Muat', save_fail:'Gagal menyimpan (penyimpanan penuh)',
     direction:'Arah', auto:'Otomatis', delete:'🗑 Hapus', save_ph:'Nama peta...',
     s_night:'🌙 Mode Malam',   s_night_desc:'Tampilan malam & efek cahaya',
     s_sound:'🔊 Suara',        s_sound_desc:'Efek suara saat meletakkan blok',
@@ -142,7 +142,7 @@ var I18N = {
     confirm_clear:'मानचित्र साफ़ करें?',
     confirm_load:' — यह मानचित्र लोड करें? वर्तमान कार्य खो जाएगा।',
     confirm_del:' — हटाएं?',
-    no_saves:'कोई सहेजा मानचित्र नहीं', selected:'चुना',
+    no_saves:'कोई सहेजा मानचित्र नहीं', selected:'चुना', load:'लोड', save_fail:'सहेजना विफल (स्टोरेज भर सकता है)',
     direction:'दिशा', auto:'स्वचालित', delete:'🗑 हटाएं', save_ph:'मानचित्र नाम...',
     s_night:'🌙 रात्रि मोड',   s_night_desc:'रात्रि दृश्य और प्रकाश प्रभाव',
     s_sound:'🔊 ध्वनि',        s_sound_desc:'ब्लॉक रखने पर ध्वनि प्रभाव',
@@ -202,6 +202,8 @@ function applyLang(newLang){
     selLabel.textContent = selBlock ? bname(selBlock) : t('selected');
   }
   rebuildSheet();
+  // スロットリスト（読込ボタンのラベル）も言語に合わせて更新
+  if(typeof renderSlots==='function') renderSlots();
 }
 
 function setText(id, str){
