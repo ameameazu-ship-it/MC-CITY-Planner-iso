@@ -338,20 +338,29 @@ function onTouchStart(e){
   isPanning=false;
   if(tool==='fill'){pushUndo();floodFill(cell.c,cell.r);return;}
   lpC=cell.c; lpR=cell.r;
-  if(getCell(cell.c,cell.r)){
-    var _lpcell=getCell(cell.c,cell.r);
-    lpCircle={c:cell.c,r:cell.r,startTime:performance.now(),duration:480,color:'#f5c842',rad:32,id:_lpcell.id};
-    if(typeof _startRafLoop==='function') _startRafLoop();
+  var _hasCell=getCell(cell.c,cell.r);
+  if(_hasCell){
+    // 既存セル：黄色の長押し移動円のみ（100ms後に開始して短いタップでは出ない）
+    var _lpcell=_hasCell;
+    setTimeout(function(){
+      if(longPressTimer===null&&!dragMoveKey) return; // 既にキャンセル済みなら出さない
+      lpCircle={c:lpC,r:lpR,startTime:performance.now(),duration:380,color:'#f5c842',rad:32,id:_lpcell.id};
+      if(typeof _startRafLoop==='function') _startRafLoop();
+    },100);
   }
   longPressTimer=setTimeout(function(){
     longPressTimer=null;
     _onLongPress(lpC,lpR,touchStartX,touchStartY);
   },480);
   isPointerDown=true;touchDrawStarted=false;stampedSet=new Set();stampStartC=cell.c;stampStartR=cell.r;
-  if(tool==='draw'){
+  if(tool==='draw'&&!_hasCell){
+    // 空セルのみ：青いスタンプ円（100ms後に開始）
     stampMode=false;
-    stampCircle={c:cell.c,r:cell.r,startTime:performance.now(),duration:STAMP_LONG_MS,color:'#50c8ff',rad:13};
-    if(typeof _startRafLoop==='function') _startRafLoop();
+    setTimeout(function(){
+      if(stampLPTimer===null) return; // キャンセル済みなら出さない
+      stampCircle={c:stampStartC,r:stampStartR,startTime:performance.now(),duration:STAMP_LONG_MS-100,color:'#50c8ff',rad:13};
+      if(typeof _startRafLoop==='function') _startRafLoop();
+    },100);
     stampLPTimer=setTimeout(function(){
       stampMode=true; stampCircle=null;
       if(vibeOn&&navigator.vibrate)navigator.vibrate([30,60,30]);
@@ -444,17 +453,24 @@ function onMouseDown(e){
   var cell=clientToCell(e.clientX,e.clientY);
   if(tool==='fill'){pushUndo();floodFill(cell.c,cell.r);return;}
   isPointerDown=true;stampStartC=cell.c;stampStartR=cell.r;stampedSet=new Set();
-  if(getCell(cell.c,cell.r)){
-    var _lpcell2=getCell(cell.c,cell.r);
-    lpCircle={c:cell.c,r:cell.r,startTime:performance.now(),duration:480,color:'#f5c842',rad:32,id:_lpcell2.id};
-    if(typeof _startRafLoop==='function') _startRafLoop();
+  var _hasCell2=getCell(cell.c,cell.r);
+  if(_hasCell2){
+    var _lpcell2=_hasCell2;
+    setTimeout(function(){
+      if(longPressTimer===null&&!dragMoveKey) return;
+      lpCircle={c:cell.c,r:cell.r,startTime:performance.now(),duration:380,color:'#f5c842',rad:32,id:_lpcell2.id};
+      if(typeof _startRafLoop==='function') _startRafLoop();
+    },100);
     longPressTimer=setTimeout(function(){longPressTimer=null;_onLongPress(cell.c,cell.r,e.clientX,e.clientY);},480);
   }
   handleDraw(cell.c,cell.r);
-  if(tool==='draw'){
+  if(tool==='draw'&&!_hasCell2){
     stampMode=false;
-    stampCircle={c:cell.c,r:cell.r,startTime:performance.now(),duration:STAMP_LONG_MS,color:'#50c8ff',rad:13};
-    if(typeof _startRafLoop==='function') _startRafLoop();
+    setTimeout(function(){
+      if(stampLPTimer===null) return;
+      stampCircle={c:cell.c,r:cell.r,startTime:performance.now(),duration:STAMP_LONG_MS-100,color:'#50c8ff',rad:13};
+      if(typeof _startRafLoop==='function') _startRafLoop();
+    },100);
     stampLPTimer=setTimeout(function(){
       stampMode=true; stampCircle=null;
       if(vibeOn&&navigator.vibrate)navigator.vibrate([30,60,30]);
