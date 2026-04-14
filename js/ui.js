@@ -11,7 +11,7 @@ var soundOn = true, vibeOn = true;
 var I18N = {
   ja:{
     draw:'描く', erase:'消す', fill:'塗り', list:'一覧',
-    undo:'戻す', redo:'進む', center:'⌖中心', settings:'設定',
+    undo:'戻す', redo:'進む', center:'✋移動', settings:'設定',
     save:'💾 保存', clear:'🗑 マップをクリア', close:'閉じる',
     confirm_clear:'マップをクリアしますか？',
     confirm_load:' を読み込みますか？現在の作業は消えます。',
@@ -29,7 +29,7 @@ var I18N = {
   },
   en:{
     draw:'Draw', erase:'Erase', fill:'Fill', list:'List',
-    undo:'Undo', redo:'Redo', center:'⌖Ctr', settings:'Settings',
+    undo:'Undo', redo:'Redo', center:'✋Move', settings:'Settings',
     save:'💾 Save', clear:'🗑 Clear Map', close:'Close',
     confirm_clear:'Clear the map?',
     confirm_load:' — load this map? Current work will be lost.',
@@ -47,7 +47,7 @@ var I18N = {
   },
   zh:{
     draw:'绘制', erase:'删除', fill:'填充', list:'列表',
-    undo:'撤销', redo:'重做', center:'⌖中心', settings:'设置',
+    undo:'撤销', redo:'重做', center:'✋移动', settings:'设置',
     save:'💾 保存', clear:'🗑 清除地图', close:'关闭',
     confirm_clear:'清除地图？',
     confirm_load:' — 加载此地图？当前内容将丢失。',
@@ -65,7 +65,7 @@ var I18N = {
   },
   ko:{
     draw:'그리기', erase:'지우기', fill:'채우기', list:'목록',
-    undo:'되돌리기', redo:'다시하기', center:'⌖중심', settings:'설정',
+    undo:'되돌리기', redo:'다시하기', center:'✋이동', settings:'설정',
     save:'💾 저장', clear:'🗑 맵 지우기', close:'닫기',
     confirm_clear:'맵을 지울까요?',
     confirm_load:' — 이 맵을 불러올까요? 현재 작업이 사라집니다.',
@@ -83,7 +83,7 @@ var I18N = {
   },
   es:{
     draw:'Dibujar', erase:'Borrar', fill:'Rellenar', list:'Lista',
-    undo:'Deshacer', redo:'Rehacer', center:'⌖Centro', settings:'Ajustes',
+    undo:'Deshacer', redo:'Rehacer', center:'✋Mover', settings:'Ajustes',
     save:'💾 Guardar', clear:'🗑 Limpiar mapa', close:'Cerrar',
     confirm_clear:'¿Limpiar el mapa?',
     confirm_load:' — ¿Cargar este mapa? Se perderá el trabajo actual.',
@@ -101,7 +101,7 @@ var I18N = {
   },
   fr:{
     draw:'Dessiner', erase:'Effacer', fill:'Remplir', list:'Liste',
-    undo:'Annuler', redo:'Refaire', center:'⌖Centre', settings:'Réglages',
+    undo:'Annuler', redo:'Refaire', center:'✋Déplacer', settings:'Réglages',
     save:'💾 Enregistrer', clear:'🗑 Effacer la carte', close:'Fermer',
     confirm_clear:'Effacer la carte ?',
     confirm_load:' — Charger cette carte ? Le travail actuel sera perdu.',
@@ -119,7 +119,7 @@ var I18N = {
   },
   id:{
     draw:'Gambar', erase:'Hapus', fill:'Isi', list:'Daftar',
-    undo:'Batal', redo:'Ulang', center:'⌖Pusat', settings:'Pengaturan',
+    undo:'Batal', redo:'Ulang', center:'✋Pindah', settings:'Pengaturan',
     save:'💾 Simpan', clear:'🗑 Hapus Peta', close:'Tutup',
     confirm_clear:'Hapus peta?',
     confirm_load:' — Muat peta ini? Pekerjaan saat ini akan hilang.',
@@ -137,7 +137,7 @@ var I18N = {
   },
   hi:{
     draw:'बनाएं', erase:'मिटाएं', fill:'भरें', list:'सूची',
-    undo:'वापस', redo:'आगे', center:'⌖केंद्र', settings:'सेटिंग',
+    undo:'वापस', redo:'आगे', center:'✋हटाएं', settings:'सेटिंग',
     save:'💾 सहेजें', clear:'🗑 मानचित्र साफ़ करें', close:'बंद करें',
     confirm_clear:'मानचित्र साफ़ करें?',
     confirm_load:' — यह मानचित्र लोड करें? वर्तमान कार्य खो जाएगा।',
@@ -159,10 +159,14 @@ function t(k){ return (I18N[lang] || I18N.ja)[k] || k; }
 function bname(b){ return b.name[lang] || b.name.en || b.name.ja; }
 
 // ── applyLang ─────────────────────────────────────────────────────
+var _langLabels={ja:'日本語',en:'English',zh:'中文',ko:'한국어',es:'Español',fr:'Français',id:'Bahasa',hi:'हिन्दी'};
+
 function applyLang(newLang){
   lang = newLang;
   document.querySelectorAll('.lang-btn').forEach(function(b){
     b.classList.toggle('active', b.dataset.lang === lang);
+    // 国旗を使わず言語名テキストに置き換え
+    if(_langLabels[b.dataset.lang]) b.textContent=_langLabels[b.dataset.lang];
   });
   var elUndo = document.getElementById('lbl-undo');       if(elUndo)     elUndo.textContent     = t('undo');
   var elRedo = document.getElementById('lbl-redo');       if(elRedo)     elRedo.textContent     = t('redo');
@@ -383,6 +387,8 @@ function initUI(){
   on('settings-close',     'click', closeSettings);
 
   document.querySelectorAll('.lang-btn').forEach(function(btn){
+    // 国旗を言語名に置き換え
+    if(_langLabels[btn.dataset.lang]) btn.textContent=_langLabels[btn.dataset.lang];
     btn.addEventListener('click', function(){ applyLang(btn.dataset.lang); });
   });
 
@@ -395,10 +401,14 @@ function initUI(){
     }
   });
 
+  on('settings-clear', 'click', function(){
+    if(!confirm(t('confirm_clear'))) return;
+    if(typeof clearAllCells==='function') clearAllCells();
+    else { cells={}; if(typeof groupMap!=='undefined') groupMap={}; scheduleRender(); }
+    closeSettings();
+  });
 
-
-
-
+  on('settings-night', 'click', toggleNight);
 
 
 
