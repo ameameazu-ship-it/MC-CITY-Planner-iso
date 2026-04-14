@@ -344,14 +344,14 @@ function onTouchStart(e){
     var _lpcell=_hasCell;
     setTimeout(function(){
       if(longPressTimer===null&&!dragMoveKey) return; // 既にキャンセル済みなら出さない
-      lpCircle={c:lpC,r:lpR,startTime:performance.now(),duration:380,color:'#f5c842',rad:32,id:_lpcell.id};
+      lpCircle={c:lpC,r:lpR,startTime:performance.now(),duration:270,color:'#f5c842',rad:32,id:_lpcell.id};
       if(typeof _startRafLoop==='function') _startRafLoop();
     },100);
   }
   longPressTimer=setTimeout(function(){
     longPressTimer=null;
     _onLongPress(lpC,lpR,touchStartX,touchStartY);
-  },480);
+  },370);
   isPointerDown=true;touchDrawStarted=false;stampedSet=new Set();stampStartC=cell.c;stampStartR=cell.r;
   if(tool==='draw'&&!_hasCell){
     // 空セルのみ：青いスタンプ円（100ms後に開始）
@@ -458,10 +458,10 @@ function onMouseDown(e){
     var _lpcell2=_hasCell2;
     setTimeout(function(){
       if(longPressTimer===null&&!dragMoveKey) return;
-      lpCircle={c:cell.c,r:cell.r,startTime:performance.now(),duration:380,color:'#f5c842',rad:32,id:_lpcell2.id};
+      lpCircle={c:cell.c,r:cell.r,startTime:performance.now(),duration:270,color:'#f5c842',rad:32,id:_lpcell2.id};
       if(typeof _startRafLoop==='function') _startRafLoop();
     },100);
-    longPressTimer=setTimeout(function(){longPressTimer=null;_onLongPress(cell.c,cell.r,e.clientX,e.clientY);},480);
+    longPressTimer=setTimeout(function(){longPressTimer=null;_onLongPress(cell.c,cell.r,e.clientX,e.clientY);},370);
   }
   handleDraw(cell.c,cell.r);
   if(tool==='draw'&&!_hasCell2){
