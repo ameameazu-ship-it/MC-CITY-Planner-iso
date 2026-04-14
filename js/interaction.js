@@ -30,7 +30,23 @@ function updateUndoBtns(){ var u=document.getElementById('btn-undo'),r=document.
 
 // ── 固定サイズブロックかチェック ──────────────────────────────────
 function isFixedSize(id){ var g=getBlockGrid(id); return g.w>1||g.h>1; }
-function _isRoadLike(){ var b=BLOCKS[resolveId(selectedId)]; return b&&(b.road||b.cat==='d')||false; }
+function _isRoadLike(){ var b=BLOCKS[resolveId(selectedId)]; return !!(b&&(b.road||b.cat==='d')); }
+
+// 8方向スナップ：タッチ座標をstartから最も近い8方向に固定
+function _snapTo8Dir(clientX, clientY){
+  if(stampStartC<0||stampStartR<0) return clientToCell(clientX,clientY);
+  var raw=clientToCell(clientX,clientY);
+  var dc=raw.c-stampStartC, dr=raw.r-stampStartR;
+  if(dc===0&&dr===0) return raw;
+  var len=Math.sqrt(dc*dc+dr*dr);
+  // 8方向に量子化
+  var angle=Math.atan2(dr,dc);
+  var snapped=Math.round(angle/(Math.PI/4))*(Math.PI/4);
+  var cosS=Math.cos(snapped), sinS=Math.sin(snapped);
+  var dot=dc*cosS+dr*sinS;
+  if(dot<0) dot=0;
+  return {c:stampStartC+Math.round(cosS*dot), r:stampStartR+Math.round(sinS*dot)};
+}
 
 // ── Merge logic（2×2のみ）────────────────────────────────────────
 function recomputeGroups(c,r){
@@ -289,6 +305,8 @@ function initInteraction(){
 
 function _onLongPress(c,r,clientX,clientY){
   lpCircle=null;
+  // 放射状リングアニメ発火
+  if(typeof triggerLpRing==='function') triggerLpRing(c,r,'#f5c842');
   var cell=getCell(c,r); if(!cell) return;
   var ac=c, ar=r;
   if(cell.ghost){ac=cell.anchorC;ar=cell.anchorR;}
@@ -321,7 +339,8 @@ function onTouchStart(e){
   if(tool==='fill'){pushUndo();floodFill(cell.c,cell.r);return;}
   lpC=cell.c; lpR=cell.r;
   if(getCell(cell.c,cell.r)){
-    lpCircle={c:cell.c,r:cell.r,startTime:performance.now(),duration:480,color:'#f5c842',rad:20};
+    var _lpcell=getCell(cell.c,cell.r);
+    lpCircle={c:cell.c,r:cell.r,startTime:performance.now(),duration:480,color:'#f5c842',rad:32,id:_lpcell.id};
     if(typeof _startRafLoop==='function') _startRafLoop();
   }
   longPressTimer=setTimeout(function(){
@@ -358,15 +377,16 @@ function onTouchMove(e){
     _lastMouseX=t0pan.clientX; _lastMouseY=t0pan.clientY;
     scheduleRender();return;
   }
-  // 閾値超えたら長押しキャンセル（cancelLongPressは円を消さない）
-  var t0m=ts[0];
-  var mdx=t0m.clientX-touchStartX, mdy=t0m.clientY-touchStartY;
-  if(Math.sqrt(mdx*mdx+mdy*mdy)>=DRAW_THRESHOLD){
-    _cancelCirclesOnMove();
-  }
-  cancelLongPress();
   if(!isPointerDown||ts.length!==1) return;
   var t0=ts[0];
+  var mdx=t0.clientX-touchStartX, mdy=t0.clientY-touchStartY;
+  var moved=Math.sqrt(mdx*mdx+mdy*mdy);
+
+  // 移動閾値(16px)を超えたら長押しキャンセル・円を消す
+  if(moved>=16){ _cancelCirclesOnMove(); }
+  // 閾値(8px)を超えたらlongPressTimerのみキャンセル（円はまだ消さない）
+  else if(moved>=DRAG_THRESHOLD){ cancelLongPress(); }
+
   if(dragMoveKey){
     var dx=t0.clientX-dragMoveOrigin.x,dy=t0.clientY-dragMoveOrigin.y;
     if(!dragMoveMode&&Math.sqrt(dx*dx+dy*dy)>DRAG_THRESHOLD){
@@ -376,18 +396,15 @@ function onTouchMove(e){
     if(dragMoveMode){var cell=clientToCell(t0.clientX,t0.clientY);hoverC=cell.c;hoverR=cell.r;_checkDragTarget(cell.c,cell.r);_doDragMove(cell.c,cell.r);}
     scheduleRender();return;
   }
-  var dx2=t0.clientX-touchStartX,dy2=t0.clientY-touchStartY;
   var cell=clientToCell(t0.clientX,t0.clientY);hoverC=cell.c;hoverR=cell.r;
-  if(!touchDrawStarted&&Math.sqrt(dx2*dx2+dy2*dy2)<DRAW_THRESHOLD){scheduleRender();return;}
+  if(!touchDrawStarted&&moved<DRAW_THRESHOLD){scheduleRender();return;}
   touchDrawStarted=true;
   if(stampMode) stampedSet=new Set();
   _didPlace=false;
-  // 道路系は少し大きく動いた場合のみセルを更新（ぶれ防止）
+  // 道路：8方向スナップで直進性を強化
   var cellToUse=cell;
-  if(_isRoadLike()&&!stampMode&&lastC>=0&&lastR>=0){
-    var dc2=Math.abs(cell.c-lastC),dr2=Math.abs(cell.r-lastR);
-    if(dc2+dr2>1){ cellToUse=cell; } // 2セル以上離れた場合のみ更新
-    else if(dc2+dr2===0){ cellToUse={c:lastC,r:lastR}; } // 同じセルなら前のセル維持
+  if(_isRoadLike()){
+    cellToUse=_snapTo8Dir(t0.clientX,t0.clientY);
   }
   handleDraw(cellToUse.c,cellToUse.r);
   if(_didPlace)_playAndVibe();_didPlace=false;
@@ -428,7 +445,8 @@ function onMouseDown(e){
   if(tool==='fill'){pushUndo();floodFill(cell.c,cell.r);return;}
   isPointerDown=true;stampStartC=cell.c;stampStartR=cell.r;stampedSet=new Set();
   if(getCell(cell.c,cell.r)){
-    lpCircle={c:cell.c,r:cell.r,startTime:performance.now(),duration:480,color:'#f5c842',rad:20};
+    var _lpcell2=getCell(cell.c,cell.r);
+    lpCircle={c:cell.c,r:cell.r,startTime:performance.now(),duration:480,color:'#f5c842',rad:32,id:_lpcell2.id};
     if(typeof _startRafLoop==='function') _startRafLoop();
     longPressTimer=setTimeout(function(){longPressTimer=null;_onLongPress(cell.c,cell.r,e.clientX,e.clientY);},480);
   }
@@ -466,7 +484,9 @@ function onWindowMouseMove(e){
   if(isPointerDown){
     if(stampMode) stampedSet=new Set();
     _didPlace=false;
-    handleDraw(cell.c,cell.r);
+    var cellToUseM=cell;
+    if(_isRoadLike()) cellToUseM=_snapTo8Dir(e.clientX,e.clientY);
+    handleDraw(cellToUseM.c,cellToUseM.r);
     if(_didPlace)_playAndVibe();_didPlace=false;
   }
   scheduleRender();
