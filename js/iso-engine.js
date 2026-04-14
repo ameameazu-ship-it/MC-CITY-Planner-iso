@@ -95,7 +95,7 @@ function _getFlashAlpha(){
 var _rafLoopRunning=false;
 function _startRafLoop(){if(_rafLoopRunning)return;_rafLoopRunning=true;requestAnimationFrame(_rafLoop);}
 function _rafLoop(){
-  var needMore=Object.keys(blockAnims).length>0||Object.keys(sinkAnims).length>0||dragFlashCells.length>0||Object.keys(groupFormedAnims).length>0||dropFeedbackAnim!==null||(typeof lpCircle!=='undefined'&&lpCircle!==null)||(typeof stampCircle!=='undefined'&&stampCircle!==null);
+  var needMore=Object.keys(blockAnims).length>0||Object.keys(sinkAnims).length>0||dragFlashCells.length>0||Object.keys(groupFormedAnims).length>0||dropFeedbackAnim!==null||(typeof lpCircle!=='undefined'&&lpCircle!==null)||(typeof stampCircle!=='undefined'&&stampCircle!==null)||lpRingAnim!==null;
   dirty=true;_renderNow();
   if(needMore)requestAnimationFrame(_rafLoop);else _rafLoopRunning=false;
 }
@@ -133,27 +133,63 @@ function shadeC(hex,f){var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,
 function mixC(a,b,t){var ar=parseInt(a.slice(1,3),16),ag=parseInt(a.slice(3,5),16),ab_=parseInt(a.slice(5,7),16),br=parseInt(b.slice(1,3),16),bg=parseInt(b.slice(3,5),16),bb=parseInt(b.slice(5,7),16);return '#'+[ar+(br-ar)*t,ag+(bg-ag)*t,ab_+(bb-ab_)*t].map(function(v){return Math.round(v).toString(16).padStart(2,'0');}).join('');}
 function groupBBox(c2){var minC=c2[0].c,maxC=c2[0].c,minR=c2[0].r,maxR=c2[0].r;for(var i=1;i<c2.length;i++){if(c2[i].c<minC)minC=c2[i].c;if(c2[i].c>maxC)maxC=c2[i].c;if(c2[i].r<minR)minR=c2[i].r;if(c2[i].r>maxR)maxR=c2[i].r;}return{minC:minC,maxC:maxC,minR:minR,maxR:maxR,w:maxC-minC+1,h:maxR-minR+1};}
 
-// ★ 長押し進捗円の描画
+// ★ 長押し進捗円：ブロックの上（指の上）に大きく表示
 function _drawProgressCircle(obj){
   if(!obj) return false;
   var elapsed=performance.now()-obj.startTime;
   if(elapsed>=obj.duration){ return false; }
   var prog=Math.min(1,elapsed/obj.duration);
   var s=cellToScreen(obj.c,obj.r);
-  var cx2=s.x, cy2=s.y+HH*zoom;
-  var radius=(obj.rad||20)*zoom;
+  // ブロックの高さ分上にずらして「指の上」に表示
+  var b=BLOCKS[obj.id]||null;
+  var bh=b?b.bh:30;
+  var cx2=s.x;
+  var cy2=s.y - bh*zoom - 18*zoom;  // ブロック屋根のさらに上
+  var radius=(obj.rad||32)*zoom;
   var startAngle=-Math.PI/2;
   var endAngle=startAngle+Math.PI*2*prog;
   gctx.save();
   gctx.lineCap='round';
+  // 背景リング（半透明黒）
   gctx.beginPath();gctx.arc(cx2,cy2,radius,0,Math.PI*2);
-  gctx.strokeStyle='rgba(0,0,0,0.35)';gctx.lineWidth=5*zoom;gctx.stroke();
+  gctx.strokeStyle='rgba(0,0,0,0.30)';gctx.lineWidth=7*zoom;gctx.stroke();
+  // 進捗弧（カラー）
   if(prog>0.01){
     gctx.beginPath();gctx.arc(cx2,cy2,radius,startAngle,endAngle);
-    gctx.strokeStyle=obj.color;gctx.lineWidth=3.5*zoom;gctx.stroke();
+    gctx.strokeStyle=obj.color;gctx.lineWidth=5*zoom;gctx.stroke();
   }
   gctx.restore();
   return prog<1;
+}
+
+// ★ 長押し完了時：放射状に広がって消えるリングアニメ
+var lpRingAnim=null;   // {x,y,startTime,color}
+var LP_RING_DURATION=400;
+
+function triggerLpRing(c,r,color){
+  var b=BLOCKS[getCell(c,r)&&getCell(c,r).id]||null;
+  var bh=b?b.bh:30;
+  var s=cellToScreen(c,r);
+  lpRingAnim={x:s.x, y:s.y-bh*zoom-18*zoom, startTime:performance.now(), color:color||'#f5c842'};
+  _startRafLoop();
+}
+
+function _drawLpRing(){
+  if(!lpRingAnim) return false;
+  var elapsed=performance.now()-lpRingAnim.startTime;
+  if(elapsed>=LP_RING_DURATION){lpRingAnim=null;return false;}
+  var t=elapsed/LP_RING_DURATION;
+  // 広がりながらフェードアウト
+  var alpha=Math.max(0,1-t);
+  var radius=(32+60*t)*zoom;
+  gctx.save();
+  gctx.globalAlpha=alpha;
+  gctx.beginPath();gctx.arc(lpRingAnim.x,lpRingAnim.y,radius,0,Math.PI*2);
+  gctx.strokeStyle=lpRingAnim.color;
+  gctx.lineWidth=Math.max(1,(4*(1-t))*zoom);
+  gctx.stroke();
+  gctx.restore();
+  return true;
 }
 
 function render(){if(!dirty)return;_renderNow();}
@@ -173,7 +209,19 @@ function _renderNow(){
     var ng=(bgTheme==='snow')?'rgba(30,70,120,0.35)':'rgba(255,255,255,0.09)';
     var gstroke=showGrid?(nightMode?ng:pal[4]):null;
     var gstrokeW=showGrid?0.5:0;
-    drawDiamond(gctx,s.x,s.y,gfill,gstroke,gstrokeW);
+    if(showGrid){
+      drawDiamond(gctx,s.x,s.y,gfill,gstroke,gstrokeW);
+    } else {
+      // グリッドOFF時：タイル間の隙間をなくすため1px大きく描画
+      var hw2=HW*zoom+0.75, hh2=HH*zoom+0.75;
+      gctx.beginPath();
+      gctx.moveTo(s.x,    s.y);
+      gctx.lineTo(s.x+hw2,s.y+hh2);
+      gctx.lineTo(s.x,    s.y+hh2*2);
+      gctx.lineTo(s.x-hw2,s.y+hh2);
+      gctx.closePath();
+      gctx.fillStyle=gfill; gctx.fill();
+    }
   });
 
   // Pass 2: ブロック（ゴーストスキップ・固定サイズはスケーリング）
@@ -323,12 +371,13 @@ function _renderNow(){
   // Hover
   if(hoverC>=0&&hoverR>=0&&inGrid(hoverC,hoverR)){var hs=cellToScreen(hoverC,hoverR);drawDiamond(gctx,hs.x,hs.y,'rgba(245,200,66,0.18)','rgba(245,200,66,0.7)',1.5);}
 
-  // Pass 7: 長押し進捗円（ドラッグ中は非表示）
+  // Pass 7: 長押し進捗円 + 完了リングアニメ（ドラッグ中は非表示）
   var isDragging2=(typeof dragMoveKey!=='undefined'&&dragMoveKey!==null);
   if(!isDragging2){
     var lpcAlive=(typeof lpCircle!=='undefined')&&_drawProgressCircle(lpCircle);
     var spcAlive=(typeof stampCircle!=='undefined')&&_drawProgressCircle(stampCircle);
-    if(lpcAlive||spcAlive) _startRafLoop();
+    var ringAlive=_drawLpRing();
+    if(lpcAlive||spcAlive||ringAlive) _startRafLoop();
   }
 
   dirty=false;
